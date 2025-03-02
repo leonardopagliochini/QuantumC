@@ -1,0 +1,3571 @@
+{
+	"children" : 
+	[
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__u_char"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__u_short"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__u_int"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__u_long"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__int8_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__uint8_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__int16_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__uint16_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__int32_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__uint32_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__int64_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__uint64_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "TypeRef",
+					"name" : "__int8_t"
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "__int_least8_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "TypeRef",
+					"name" : "__uint8_t"
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "__uint_least8_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "TypeRef",
+					"name" : "__int16_t"
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "__int_least16_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "TypeRef",
+					"name" : "__uint16_t"
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "__uint_least16_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "TypeRef",
+					"name" : "__int32_t"
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "__int_least32_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "TypeRef",
+					"name" : "__uint32_t"
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "__uint_least32_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "TypeRef",
+					"name" : "__int64_t"
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "__int_least64_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "TypeRef",
+					"name" : "__uint64_t"
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "__uint_least64_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__quad_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__u_quad_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__intmax_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__uintmax_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__dev_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__uid_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__gid_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__ino_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__ino64_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__mode_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__nlink_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__off_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__off64_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__pid_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"children" : 
+					[
+						{
+							"kind" : "IntegerLiteral",
+							"name" : ""
+						}
+					],
+					"kind" : "FieldDecl",
+					"name" : "__val"
+				}
+			],
+			"kind" : "StructDecl",
+			"name" : "__fsid_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"children" : 
+					[
+						{
+							"children" : 
+							[
+								{
+									"kind" : "IntegerLiteral",
+									"name" : ""
+								}
+							],
+							"kind" : "FieldDecl",
+							"name" : "__val"
+						}
+					],
+					"kind" : "StructDecl",
+					"name" : "__fsid_t"
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "__fsid_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__clock_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__rlim_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__rlim64_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__id_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__time_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__useconds_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__suseconds_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__suseconds64_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__daddr_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__key_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__clockid_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__timer_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__blksize_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__blkcnt_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__blkcnt64_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__fsblkcnt_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__fsblkcnt64_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__fsfilcnt_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__fsfilcnt64_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__fsword_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__ssize_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__syscall_slong_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__syscall_ulong_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "TypeRef",
+					"name" : "__off64_t"
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "__loff_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__caddr_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__intptr_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__socklen_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "__sig_atomic_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "FieldDecl",
+					"name" : "__count"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "FieldDecl",
+							"name" : "__wch"
+						},
+						{
+							"children" : 
+							[
+								{
+									"kind" : "IntegerLiteral",
+									"name" : ""
+								}
+							],
+							"kind" : "FieldDecl",
+							"name" : "__wchb"
+						}
+					],
+					"kind" : "UnionDecl",
+					"name" : "union (unnamed at /usr/include/bits/types/__mbstate_t.h:16:3)"
+				},
+				{
+					"children" : 
+					[
+						{
+							"children" : 
+							[
+								{
+									"kind" : "FieldDecl",
+									"name" : "__wch"
+								},
+								{
+									"children" : 
+									[
+										{
+											"kind" : "IntegerLiteral",
+											"name" : ""
+										}
+									],
+									"kind" : "FieldDecl",
+									"name" : "__wchb"
+								}
+							],
+							"kind" : "UnionDecl",
+							"name" : "union (unnamed at /usr/include/bits/types/__mbstate_t.h:16:3)"
+						}
+					],
+					"kind" : "FieldDecl",
+					"name" : "__value"
+				}
+			],
+			"kind" : "StructDecl",
+			"name" : "__mbstate_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"children" : 
+					[
+						{
+							"kind" : "FieldDecl",
+							"name" : "__count"
+						},
+						{
+							"children" : 
+							[
+								{
+									"kind" : "FieldDecl",
+									"name" : "__wch"
+								},
+								{
+									"children" : 
+									[
+										{
+											"kind" : "IntegerLiteral",
+											"name" : ""
+										}
+									],
+									"kind" : "FieldDecl",
+									"name" : "__wchb"
+								}
+							],
+							"kind" : "UnionDecl",
+							"name" : "union (unnamed at /usr/include/bits/types/__mbstate_t.h:16:3)"
+						},
+						{
+							"children" : 
+							[
+								{
+									"children" : 
+									[
+										{
+											"kind" : "FieldDecl",
+											"name" : "__wch"
+										},
+										{
+											"children" : 
+											[
+												{
+													"kind" : "IntegerLiteral",
+													"name" : ""
+												}
+											],
+											"kind" : "FieldDecl",
+											"name" : "__wchb"
+										}
+									],
+									"kind" : "UnionDecl",
+									"name" : "union (unnamed at /usr/include/bits/types/__mbstate_t.h:16:3)"
+								}
+							],
+							"kind" : "FieldDecl",
+							"name" : "__value"
+						}
+					],
+					"kind" : "StructDecl",
+					"name" : "__mbstate_t"
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "__mbstate_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "__off_t"
+						}
+					],
+					"kind" : "FieldDecl",
+					"name" : "__pos"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "__mbstate_t"
+						}
+					],
+					"kind" : "FieldDecl",
+					"name" : "__state"
+				}
+			],
+			"kind" : "StructDecl",
+			"name" : "_G_fpos_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"children" : 
+					[
+						{
+							"children" : 
+							[
+								{
+									"kind" : "TypeRef",
+									"name" : "__off_t"
+								}
+							],
+							"kind" : "FieldDecl",
+							"name" : "__pos"
+						},
+						{
+							"children" : 
+							[
+								{
+									"kind" : "TypeRef",
+									"name" : "__mbstate_t"
+								}
+							],
+							"kind" : "FieldDecl",
+							"name" : "__state"
+						}
+					],
+					"kind" : "StructDecl",
+					"name" : "_G_fpos_t"
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "__fpos_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "__off64_t"
+						}
+					],
+					"kind" : "FieldDecl",
+					"name" : "__pos"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "__mbstate_t"
+						}
+					],
+					"kind" : "FieldDecl",
+					"name" : "__state"
+				}
+			],
+			"kind" : "StructDecl",
+			"name" : "_G_fpos64_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"children" : 
+					[
+						{
+							"children" : 
+							[
+								{
+									"kind" : "TypeRef",
+									"name" : "__off64_t"
+								}
+							],
+							"kind" : "FieldDecl",
+							"name" : "__pos"
+						},
+						{
+							"children" : 
+							[
+								{
+									"kind" : "TypeRef",
+									"name" : "__mbstate_t"
+								}
+							],
+							"kind" : "FieldDecl",
+							"name" : "__state"
+						}
+					],
+					"kind" : "StructDecl",
+					"name" : "_G_fpos64_t"
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "__fpos64_t"
+		},
+		{
+			"kind" : "StructDecl",
+			"name" : "_IO_FILE"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "TypeRef",
+					"name" : "struct _IO_FILE"
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "__FILE"
+		},
+		{
+			"kind" : "StructDecl",
+			"name" : "_IO_FILE"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "TypeRef",
+					"name" : "struct _IO_FILE"
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "FILE"
+		},
+		{
+			"kind" : "StructDecl",
+			"name" : "_IO_FILE"
+		},
+		{
+			"kind" : "StructDecl",
+			"name" : "_IO_marker"
+		},
+		{
+			"kind" : "StructDecl",
+			"name" : "_IO_codecvt"
+		},
+		{
+			"kind" : "StructDecl",
+			"name" : "_IO_wide_data"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "_IO_lock_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "FieldDecl",
+					"name" : "_flags"
+				},
+				{
+					"kind" : "FieldDecl",
+					"name" : "_IO_read_ptr"
+				},
+				{
+					"kind" : "FieldDecl",
+					"name" : "_IO_read_end"
+				},
+				{
+					"kind" : "FieldDecl",
+					"name" : "_IO_read_base"
+				},
+				{
+					"kind" : "FieldDecl",
+					"name" : "_IO_write_base"
+				},
+				{
+					"kind" : "FieldDecl",
+					"name" : "_IO_write_ptr"
+				},
+				{
+					"kind" : "FieldDecl",
+					"name" : "_IO_write_end"
+				},
+				{
+					"kind" : "FieldDecl",
+					"name" : "_IO_buf_base"
+				},
+				{
+					"kind" : "FieldDecl",
+					"name" : "_IO_buf_end"
+				},
+				{
+					"kind" : "FieldDecl",
+					"name" : "_IO_save_base"
+				},
+				{
+					"kind" : "FieldDecl",
+					"name" : "_IO_backup_base"
+				},
+				{
+					"kind" : "FieldDecl",
+					"name" : "_IO_save_end"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "struct _IO_marker"
+						}
+					],
+					"kind" : "FieldDecl",
+					"name" : "_markers"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "struct _IO_FILE"
+						}
+					],
+					"kind" : "FieldDecl",
+					"name" : "_chain"
+				},
+				{
+					"kind" : "FieldDecl",
+					"name" : "_fileno"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "IntegerLiteral",
+							"name" : ""
+						}
+					],
+					"kind" : "FieldDecl",
+					"name" : "_flags2"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "IntegerLiteral",
+							"name" : ""
+						}
+					],
+					"kind" : "FieldDecl",
+					"name" : "_short_backupbuf"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "__off_t"
+						}
+					],
+					"kind" : "FieldDecl",
+					"name" : "_old_offset"
+				},
+				{
+					"kind" : "FieldDecl",
+					"name" : "_cur_column"
+				},
+				{
+					"kind" : "FieldDecl",
+					"name" : "_vtable_offset"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "IntegerLiteral",
+							"name" : ""
+						}
+					],
+					"kind" : "FieldDecl",
+					"name" : "_shortbuf"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "_IO_lock_t"
+						}
+					],
+					"kind" : "FieldDecl",
+					"name" : "_lock"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "__off64_t"
+						}
+					],
+					"kind" : "FieldDecl",
+					"name" : "_offset"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "struct _IO_codecvt"
+						}
+					],
+					"kind" : "FieldDecl",
+					"name" : "_codecvt"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "struct _IO_wide_data"
+						}
+					],
+					"kind" : "FieldDecl",
+					"name" : "_wide_data"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "struct _IO_FILE"
+						}
+					],
+					"kind" : "FieldDecl",
+					"name" : "_freeres_list"
+				},
+				{
+					"kind" : "FieldDecl",
+					"name" : "_freeres_buf"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "struct _IO_FILE"
+						}
+					],
+					"kind" : "FieldDecl",
+					"name" : "_prevchain"
+				},
+				{
+					"kind" : "FieldDecl",
+					"name" : "_mode"
+				},
+				{
+					"children" : 
+					[
+						{
+							"children" : 
+							[
+								{
+									"children" : 
+									[
+										{
+											"children" : 
+											[
+												{
+													"kind" : "IntegerLiteral",
+													"name" : ""
+												}
+											],
+											"kind" : "UnexposedExpr",
+											"name" : ""
+										},
+										{
+											"kind" : "UnaryExpr",
+											"name" : ""
+										}
+									],
+									"kind" : "BinaryOperator",
+									"name" : "*"
+								},
+								{
+									"children" : 
+									[
+										{
+											"children" : 
+											[
+												{
+													"kind" : "IntegerLiteral",
+													"name" : ""
+												}
+											],
+											"kind" : "UnexposedExpr",
+											"name" : ""
+										},
+										{
+											"kind" : "UnaryExpr",
+											"name" : ""
+										}
+									],
+									"kind" : "BinaryOperator",
+									"name" : "*"
+								}
+							],
+							"kind" : "BinaryOperator",
+							"name" : "-"
+						}
+					],
+					"kind" : "FieldDecl",
+					"name" : "_unused2"
+				}
+			],
+			"kind" : "StructDecl",
+			"name" : "_IO_FILE"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "TypeRef",
+					"name" : "__ssize_t"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__cookie"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__buf"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__nbytes"
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "cookie_read_function_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "TypeRef",
+					"name" : "__ssize_t"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__cookie"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__buf"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__nbytes"
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "cookie_write_function_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "ParmDecl",
+					"name" : "__cookie"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "__off64_t"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__pos"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__w"
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "cookie_seek_function_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "ParmDecl",
+					"name" : "__cookie"
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "cookie_close_function_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "cookie_read_function_t"
+						}
+					],
+					"kind" : "FieldDecl",
+					"name" : "read"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "cookie_write_function_t"
+						}
+					],
+					"kind" : "FieldDecl",
+					"name" : "write"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "cookie_seek_function_t"
+						}
+					],
+					"kind" : "FieldDecl",
+					"name" : "seek"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "cookie_close_function_t"
+						}
+					],
+					"kind" : "FieldDecl",
+					"name" : "close"
+				}
+			],
+			"kind" : "StructDecl",
+			"name" : "_IO_cookie_io_functions_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"children" : 
+					[
+						{
+							"children" : 
+							[
+								{
+									"kind" : "TypeRef",
+									"name" : "cookie_read_function_t"
+								}
+							],
+							"kind" : "FieldDecl",
+							"name" : "read"
+						},
+						{
+							"children" : 
+							[
+								{
+									"kind" : "TypeRef",
+									"name" : "cookie_write_function_t"
+								}
+							],
+							"kind" : "FieldDecl",
+							"name" : "write"
+						},
+						{
+							"children" : 
+							[
+								{
+									"kind" : "TypeRef",
+									"name" : "cookie_seek_function_t"
+								}
+							],
+							"kind" : "FieldDecl",
+							"name" : "seek"
+						},
+						{
+							"children" : 
+							[
+								{
+									"kind" : "TypeRef",
+									"name" : "cookie_close_function_t"
+								}
+							],
+							"kind" : "FieldDecl",
+							"name" : "close"
+						}
+					],
+					"kind" : "StructDecl",
+					"name" : "_IO_cookie_io_functions_t"
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "cookie_io_functions_t"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "va_list"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "TypeRef",
+					"name" : "__off_t"
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "off_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "TypeRef",
+					"name" : "__ssize_t"
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "ssize_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "TypeRef",
+					"name" : "__fpos_t"
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "fpos_t"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "TypeRef",
+					"name" : "FILE"
+				}
+			],
+			"kind" : "VarDecl",
+			"name" : "stdin"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "TypeRef",
+					"name" : "FILE"
+				}
+			],
+			"kind" : "VarDecl",
+			"name" : "stdout"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "TypeRef",
+					"name" : "FILE"
+				}
+			],
+			"kind" : "VarDecl",
+			"name" : "stderr"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__filename"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "remove"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__old"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__new"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "rename"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__oldfd"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__old"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__newfd"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__new"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "renameat"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fclose"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "TypeRef",
+					"name" : "FILE"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "tmpfile"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "IntegerLiteral",
+							"name" : ""
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : ""
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "tmpnam"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "IntegerLiteral",
+							"name" : ""
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__s"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "tmpnam_r"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__dir"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__pfx"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "tempnam"
+		},
+		{
+			"children" : 
+			[
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fflush"
+		},
+		{
+			"children" : 
+			[
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fflush_unlocked"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "TypeRef",
+					"name" : "FILE"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__filename"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__modes"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fopen"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "TypeRef",
+					"name" : "FILE"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__filename"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__modes"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "freopen"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "TypeRef",
+					"name" : "FILE"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__fd"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__modes"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fdopen"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "TypeRef",
+					"name" : "FILE"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__magic_cookie"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__modes"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "cookie_io_functions_t"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__io_funcs"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fopencookie"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "TypeRef",
+					"name" : "FILE"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__s"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__len"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__modes"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fmemopen"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "TypeRef",
+					"name" : "FILE"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__bufloc"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__sizeloc"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "open_memstream"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__buf"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "setbuf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__buf"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__modes"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__n"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "setvbuf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__buf"
+				},3
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__format"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fprintf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__format"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "printf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__s"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__format"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "sprintf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__s"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__format"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__arg"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "vfprintf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "ParmDecl",
+					"name" : "__format"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__arg"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "vprintf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__s"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__format"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__arg"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "vsprintf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__s"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__maxlen"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__format"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "snprintf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__s"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__maxlen"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__format"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__arg"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "vsnprintf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__ptr"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__f"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__arg"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "vasprintf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__ptr"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__fmt"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "__asprintf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__ptr"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__fmt"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "asprintf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__fd"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__fmt"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__arg"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "vdprintf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__fd"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__fmt"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "dprintf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__format"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fscanf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__format"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "scanf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__s"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__format"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "sscanf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				}
+			],
+			"kind" : "TypedefDecl",
+			"name" : "__cfloat128"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "_Float128"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "_Float32"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "_Float64"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "_Float32x"
+		},
+		{
+			"kind" : "TypedefDecl",
+			"name" : "_Float64x"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "asm label",
+					"name" : "__isoc99_fscanf"
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__format"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fscanf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "asm label",
+					"name" : "__isoc99_scanf"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__format"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "scanf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "asm label",
+					"name" : "__isoc99_sscanf"
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__s"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__format"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "sscanf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__s"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__format"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__arg"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "vfscanf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__format"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__arg"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "vscanf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__s"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__format"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__arg"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "vsscanf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "asm label",
+					"name" : "__isoc99_vfscanf"
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__s"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__format"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__arg"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "vfscanf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "asm label",
+					"name" : "__isoc99_vscanf"
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__format"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__arg"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "vscanf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "asm label",
+					"name" : "__isoc99_vsscanf"
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__s"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__format"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__arg"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "vsscanf"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"3
+		},
+		{
+			"kind" : "FunctionDecl",
+			"name" : "getchar"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "getc_unlocked"
+		},
+		{
+			"kind" : "FunctionDecl",
+			"name" : "getchar_unlocked"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fgetc_unlocked"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__c"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fputc"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__c"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "putc"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "ParmDecl",
+					"name" : "__c"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "putchar"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__c"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fputc_unlocked"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__c"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "putc_unlocked"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "ParmDecl",
+					"name" : "__c"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "putchar_unlocked"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "getw"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__w"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "putw"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__s"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__n"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fgets"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "TypeRef",
+					"name" : "__ssize_t"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__lineptr"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__n"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__delimiter"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "__getdelim"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "TypeRef",
+					"name" : "__ssize_t"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__lineptr"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__n"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__delimiter"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "getdelim"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "TypeRef",
+					"name" : "__ssize_t"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__lineptr"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__n"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "getline"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__s"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fputs"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "ParmDecl",
+					"name" : "__s"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "puts"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__c"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "ungetc"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__ptr"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__size"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__n"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fread"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__ptr"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__size"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__n"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__s"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fwrite"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__ptr"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__size"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__n"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fread_unlocked"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__ptr"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__size"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__n"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fwrite_unlocked"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__off"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__whence"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fseek"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "ftell"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "rewind"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "__off_t"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__off"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__whence"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fseeko"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "TypeRef",
+					"name" : "__off_t"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "ftello"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "fpos_t"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__pos"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fgetpos"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "fpos_t"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__pos"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fsetpos"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "clearerr"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "feof"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "ferror"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "clearerr_unlocked"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "feof_unlocked"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "ferror_unlocked"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__s"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "perror"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fileno"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "fileno_unlocked"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "pclose"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "TypeRef",
+					"name" : "FILE"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__command"
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__modes"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "popen"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : "__s"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "ctermid"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "flockfile"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "ftrylockfile"
+		},
+		{
+			"children" : 
+			[
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"kind" : "UnexposedAttr",
+					"name" : ""
+				},
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : "__stream"
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "funlockfile"
+		},
+		{
+			"children" : 
+			[
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : ""
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "__uflow"
+		},
+		{
+			"children" : 
+			[
+				{
+					"children" : 
+					[
+						{
+							"kind" : "TypeRef",
+							"name" : "FILE"
+						}
+					],
+					"kind" : "ParmDecl",
+					"name" : ""
+				},
+				{
+					"kind" : "ParmDecl",
+					"name" : ""
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "__overflow"
+		},
+		{
+			"children" : 
+			[
+				{
+					"children" : 
+					[
+						{
+							"children" : 
+							[
+								{
+									"children" : 
+									[
+										{
+											"children" : 
+											[
+												{
+													"kind" : "IntegerLiteral",
+													"name" : ""
+												},
+												{
+													"kind" : "IntegerLiteral",
+													"name" : ""
+												}
+											],
+											"kind" : "BinaryOperator",
+											"name" : "+"
+										}
+									],
+									"kind" : "VarDecl",
+									"name" : "sum"
+								}
+							],
+							"kind" : "DeclStmt",
+							"name" : ""
+						},
+						{
+							"children" : 
+							[
+								{
+									"kind" : "IntegerLiteral",
+									"name" : ""
+								}
+							],
+							"kind" : "ReturnStmt",
+							"name" : ""
+						}
+					],
+					"kind" : "CompoundStmt",
+					"name" : ""
+				}
+			],
+			"kind" : "FunctionDecl",
+			"name" : "main"
+		}
+	],
+	"kind" : "TranslationUnit",
+	"name" : "try.c"
+}
