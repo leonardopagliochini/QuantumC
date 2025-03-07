@@ -26,7 +26,7 @@ def astJsonGen(input_dir="c_code"):
     for c_file in c_files:
         c_file_path = os.path.join(c_code_folder, c_file)
         base_name = os.path.splitext(c_file)[0]  # Get base name without extension
-        json_output_path = os.path.join(json_out_folder, f'{base_name}_ast.json')
+        json_output_path = os.path.join(json_out_folder, f'{base_name}.json')
 
         # Run clang to generate AST in JSON format
         clang_ast_cmd_json = f'clang -Xclang -ast-dump=json -fsyntax-only {c_file_path} > {json_output_path}'

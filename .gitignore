@@ -1,1 +1,4 @@
 .vscode
+__pycache__
+output
+json_out
