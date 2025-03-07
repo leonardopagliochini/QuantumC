@@ -1,14 +1,19 @@
 # Compilation Process
 
 ## Links
-[](https://github.com/markjasongalang/Lexical-Syntax-and-Semantic-Analyzer-in-GUI-using-Java)
-[](https://docsbot.ai/prompts/programming/lexical-analyzer-with-gui)\
-[](https://dev.to/balapriya/abstract-syntax-tree-ast-explained-in-plain-english-1h38)
-[](https://keleshev.com/abstract-syntax-tree-an-example-in-c/)
-[](https://www-old.cs.utah.edu/flux/flick/current/doc/guts/gutsch6.html)
-[](https://docs.python.org/3/library/ast.html)
-[](https://en.wikipedia.org/wiki/Abstract_syntax_tree)
+[github.com/markjasongalang/Lexical-Syntax-and-Semantic-Analyzer-in-GUI-using-Java](https://github.com/markjasongalang/Lexical-Syntax-and-Semantic-Analyzer-in-GUI-using-Java)
 
+[docsbot.ai/prompts/programming/lexical-analyzer-with-gui](https://docsbot.ai/prompts/programming/lexical-analyzer-with-gui)
+
+[dev.to/balapriya/abstract-syntax-tree-ast-explained-in-plain-english-1h38](https://dev.to/balapriya/abstract-syntax-tree-ast-explained-in-plain-english-1h38)
+
+[keleshev.com/abstract-syntax-tree-an-example-in-c/](https://keleshev.com/abstract-syntax-tree-an-example-in-c/)
+
+[www-old.cs.utah.edu/flux/flick/current/doc/guts/gutsch6.html](https://www-old.cs.utah.edu/flux/flick/current/doc/guts/gutsch6.html)
+
+[docs.python.org/3/library/ast.html](https://docs.python.org/3/library/ast.html)
+
+[en.wikipedia.org/wiki/Abstract_syntax_tree](https://en.wikipedia.org/wiki/Abstract_syntax_tree)
 
 
 ## Steps
