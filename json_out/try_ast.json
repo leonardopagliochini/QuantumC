@@ -1,5 +1,5 @@
 {
-  "id": "0x5b02101ad3b8",
+  "id": "0x60f69bf9f3b8",
   "kind": "TranslationUnitDecl",
   "loc": {},
   "range": {
@@ -8,7 +8,7 @@
   },
   "inner": [
     {
-      "id": "0x5b02101adbe8",
+      "id": "0x60f69bf9fbe8",
       "kind": "TypedefDecl",
       "loc": {},
       "range": {
@@ -22,7 +22,7 @@
       },
       "inner": [
         {
-          "id": "0x5b02101ad980",
+          "id": "0x60f69bf9f980",
           "kind": "BuiltinType",
           "type": {
             "qualType": "__int128"
@@ -31,7 +31,7 @@
       ]
     },
     {
-      "id": "0x5b02101adc58",
+      "id": "0x60f69bf9fc58",
       "kind": "TypedefDecl",
       "loc": {},
       "range": {
@@ -45,7 +45,7 @@
       },
       "inner": [
         {
-          "id": "0x5b02101ad9a0",
+          "id": "0x60f69bf9f9a0",
           "kind": "BuiltinType",
           "type": {
             "qualType": "unsigned __int128"
@@ -54,7 +54,7 @@
       ]
     },
     {
-      "id": "0x5b02101adf60",
+      "id": "0x60f69bf9ff60",
       "kind": "TypedefDecl",
       "loc": {},
       "range": {
@@ -68,13 +68,13 @@
       },
       "inner": [
         {
-          "id": "0x5b02101add30",
+          "id": "0x60f69bf9fd30",
           "kind": "RecordType",
           "type": {
             "qualType": "struct __NSConstantString_tag"
           },
           "decl": {
-            "id": "0x5b02101adcb0",
+            "id": "0x60f69bf9fcb0",
             "kind": "RecordDecl",
             "name": "__NSConstantString_tag"
           }
@@ -82,7 +82,7 @@
       ]
     },
     {
-      "id": "0x5b02101ae008",
+      "id": "0x60f69bfa0008",
       "kind": "TypedefDecl",
       "loc": {},
       "range": {
@@ -96,14 +96,14 @@
       },
       "inner": [
         {
-          "id": "0x5b02101adfc0",
+          "id": "0x60f69bf9ffc0",
           "kind": "PointerType",
           "type": {
             "qualType": "char *"
           },
           "inner": [
             {
-              "id": "0x5b02101ad460",
+              "id": "0x60f69bf9f460",
               "kind": "BuiltinType",
               "type": {
                 "qualType": "char"
@@ -114,7 +114,7 @@
       ]
     },
     {
-      "id": "0x5b02101ae300",
+      "id": "0x60f69bfa0300",
       "kind": "TypedefDecl",
       "loc": {},
       "range": {
@@ -128,7 +128,7 @@
       },
       "inner": [
         {
-          "id": "0x5b02101ae2a0",
+          "id": "0x60f69bfa02a0",
           "kind": "ConstantArrayType",
           "type": {
             "qualType": "struct __va_list_tag[1]"
@@ -136,13 +136,13 @@
           "size": 1,
           "inner": [
             {
-              "id": "0x5b02101ae0e0",
+              "id": "0x60f69bfa00e0",
               "kind": "RecordType",
               "type": {
                 "qualType": "struct __va_list_tag"
               },
               "decl": {
-                "id": "0x5b02101ae060",
+                "id": "0x60f69bfa0060",
                 "kind": "RecordDecl",
                 "name": "__va_list_tag"
               }
@@ -152,7 +152,7 @@
       ]
     },
     {
-      "id": "0x5b021020d628",
+      "id": "0x60f69bfff628",
       "kind": "FunctionDecl",
       "loc": {
         "offset": 4,
@@ -181,7 +181,7 @@
       },
       "inner": [
         {
-          "id": "0x5b021020d920",
+          "id": "0x60f69bfff920",
           "kind": "CompoundStmt",
           "range": {
             "begin": {
@@ -199,7 +199,7 @@
           },
           "inner": [
             {
-              "id": "0x5b021020d7f8",
+              "id": "0x60f69bfff7f8",
               "kind": "DeclStmt",
               "range": {
                 "begin": {
@@ -216,7 +216,7 @@
               },
               "inner": [
                 {
-                  "id": "0x5b021020d730",
+                  "id": "0x60f69bfff730",
                   "kind": "VarDecl",
                   "loc": {
                     "offset": 21,
@@ -243,7 +243,7 @@
                   "init": "c",
                   "inner": [
                     {
-                      "id": "0x5b021020d7d8",
+                      "id": "0x60f69bfff7d8",
                       "kind": "BinaryOperator",
                       "range": {
                         "begin": {
@@ -264,7 +264,7 @@
                       "opcode": "+",
                       "inner": [
                         {
-                          "id": "0x5b021020d798",
+                          "id": "0x60f69bfff798",
                           "kind": "IntegerLiteral",
                           "range": {
                             "begin": {
@@ -285,7 +285,7 @@
                           "value": "2"
                         },
                         {
-                          "id": "0x5b021020d7b8",
+                          "id": "0x60f69bfff7b8",
                           "kind": "IntegerLiteral",
                           "range": {
                             "begin": {
@@ -312,7 +312,7 @@
               ]
             },
             {
-              "id": "0x5b021020d908",
+              "id": "0x60f69bfff908",
               "kind": "DeclStmt",
               "range": {
                 "begin": {
@@ -329,7 +329,7 @@
               },
               "inner": [
                 {
-                  "id": "0x5b021020d828",
+                  "id": "0x60f69bfff828",
                   "kind": "VarDecl",
                   "loc": {
                     "offset": 42,
@@ -355,7 +355,7 @@
                   "init": "c",
                   "inner": [
                     {
-                      "id": "0x5b021020d8e8",
+                      "id": "0x60f69bfff8e8",
                       "kind": "BinaryOperator",
                       "range": {
                         "begin": {
@@ -376,7 +376,7 @@
                       "opcode": "-",
                       "inner": [
                         {
-                          "id": "0x5b021020d8d0",
+                          "id": "0x60f69bfff8d0",
                           "kind": "ImplicitCastExpr",
                           "range": {
                             "begin": {
@@ -397,7 +397,7 @@
                           "castKind": "LValueToRValue",
                           "inner": [
                             {
-                              "id": "0x5b021020d890",
+                              "id": "0x60f69bfff890",
                               "kind": "DeclRefExpr",
                               "range": {
                                 "begin": {
@@ -416,7 +416,7 @@
                               },
                               "valueCategory": "lvalue",
                               "referencedDecl": {
-                                "id": "0x5b021020d730",
+                                "id": "0x60f69bfff730",
                                 "kind": "VarDecl",
                                 "name": "sum",
                                 "type": {
@@ -427,7 +427,7 @@
                           ]
                         },
                         {
-                          "id": "0x5b021020d8b0",
+                          "id": "0x60f69bfff8b0",
                           "kind": "IntegerLiteral",
                           "range": {
                             "begin": {
