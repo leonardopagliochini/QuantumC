@@ -151,4 +151,3 @@ dependencies:
       - pytz==2025.2
       - seaborn==0.13.2
       - tzdata==2025.2
-prefix: /opt/homebrew/Caskroom/miniforge/base/envs/quantumc
