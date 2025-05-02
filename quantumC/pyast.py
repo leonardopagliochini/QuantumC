@@ -1,8 +1,5 @@
 import os
 import subprocess
-import json
-from .pyass import * 
-
 
 def astJsonGen(input_dir="c_code"):
     # Save the current working directory (location of the script)
@@ -40,13 +37,3 @@ def astJsonGen(input_dir="c_code"):
             raise RuntimeError(f"Error: JSON output file {json_output_path} was not created.")
 
         print(f"JSON output saved to: {json_output_path}")
-
-def generate_riscv_commands(json_path, debug=False):
-    """Main function: given a JSON file path, print the corresponding RISC-V-like commands."""
-    with open(json_path, 'r') as f:
-        ast = json.load(f)
-
-    commands = extract_commands_from_ast(ast, debug=debug)
-
-    for cmd in commands:
-        print(cmd)
