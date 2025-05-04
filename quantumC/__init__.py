@@ -1,3 +1,3 @@
-from .pyast import astJsonGen
+from .pyast import *
 from .astdataclasses import *
-from .pyass import generate_riscv_commands
+from .pyass import *

@@ -1,0 +1,18 @@
+LI qr1, 1
+ADDI qr0, qr1, 1
+LI qr3, 2
+MUL qr2, qr3, qr0
+LI qr5, 1
+ADDI qr4, qr5, 1
+MUL qr6, qr2, qr4
+LI qr8, 1
+MUL qr7, qr8, qr2
+MUL qr9, qr7, qr6
+LI qr11, 1
+ADD qr10, qr11, qr2
+LI qr13, 1
+ADDI qr12, qr13, 7
+ADDI qr14, qr6, 1
+ADD qr15, qr6, qr2
+LI qr17, 7
+SUB qr16, qr17, qr14
