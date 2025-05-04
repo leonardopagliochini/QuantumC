@@ -1,7 +1,6 @@
 import os
 import json
 from dataclasses import dataclass, fields
-import graphviz
 from typing import List, Optional, Union, Any, Dict
 from IPython.display import Image, display
 
@@ -342,195 +341,195 @@ class ASTProcessor:
     # AST TO GRAPHVIZ
     # --------------------
 
-    def ast_to_graphviz(self, node: ASTNode, graph: graphviz.Digraph, parent_id: str = None, edge_label: str = "") -> None:
-        """
-        Recursively add AST nodes to Graphviz diagram with enhanced operator visualization
-        and handle all statement types (CompoundStmt, DeclStmt, etc.).
-        """
-        node_id = str(id(node))
+    # def ast_to_graphviz(self, node: ASTNode, graph: graphviz.Digraph, parent_id: str = None, edge_label: str = "") -> None:
+    #     """
+    #     Recursively add AST nodes to Graphviz diagram with enhanced operator visualization
+    #     and handle all statement types (CompoundStmt, DeclStmt, etc.).
+    #     """
+    #     node_id = str(id(node))
         
-        # Default label is just the node's kind:
-        label = f"{node.kind}"
+    #     # Default label is just the node's kind:
+    #     label = f"{node.kind}"
 
-        # Add more descriptive labels for certain node types
-        if isinstance(node, BinaryOperator):
-            label = f"Binary Operator\n{node.opcode}"
-        elif isinstance(node, IntegerLiteral):
-            label = f"Integer Literal\n{node.value}"
-        elif isinstance(node, VarDecl):
-            label = f"Variable Declaration\n{node.name}"
-        elif isinstance(node, CompoundStmt):
-            label = f"Compound Statement"
-        elif isinstance(node, DeclStmt):
-            label = f"Declaration Statement"
+    #     # Add more descriptive labels for certain node types
+    #     if isinstance(node, BinaryOperator):
+    #         label = f"Binary Operator\n{node.opcode}"
+    #     elif isinstance(node, IntegerLiteral):
+    #         label = f"Integer Literal\n{node.value}"
+    #     elif isinstance(node, VarDecl):
+    #         label = f"Variable Declaration\n{node.name}"
+    #     elif isinstance(node, CompoundStmt):
+    #         label = f"Compound Statement"
+    #     elif isinstance(node, DeclStmt):
+    #         label = f"Declaration Statement"
 
-        # Optionally add type info if available
-        if hasattr(node, 'type') and node.type:
-            qual = node.type.get('qualType', 'unknown')
-            label += f"\nType: {qual}"
+    #     # Optionally add type info if available
+    #     if hasattr(node, 'type') and node.type:
+    #         qual = node.type.get('qualType', 'unknown')
+    #         label += f"\nType: {qual}"
 
-        # Create the Graphviz node
-        graph.node(node_id, label=label)
+    #     # Create the Graphviz node
+    #     graph.node(node_id, label=label)
 
-        # Link to the parent, if any
-        if parent_id:
-            graph.edge(parent_id, node_id, label=edge_label)
+    #     # Link to the parent, if any
+    #     if parent_id:
+    #         graph.edge(parent_id, node_id, label=edge_label)
 
-        # ------------------
-        # RECURSE
-        # ------------------
-        if isinstance(node, TranslationUnitDecl) and node.inner:
-            for child in node.inner:
-                self.ast_to_graphviz(child, graph, node_id)
+    #     # ------------------
+    #     # RECURSE
+    #     # ------------------
+    #     if isinstance(node, TranslationUnitDecl) and node.inner:
+    #         for child in node.inner:
+    #             self.ast_to_graphviz(child, graph, node_id)
 
-        elif isinstance(node, FunctionDecl) and node.inner:
-            for child in node.inner:
-                self.ast_to_graphviz(child, graph, node_id)
+    #     elif isinstance(node, FunctionDecl) and node.inner:
+    #         for child in node.inner:
+    #             self.ast_to_graphviz(child, graph, node_id)
 
-        elif isinstance(node, CompoundStmt) and node.inner:
-            for child in node.inner:
-                self.ast_to_graphviz(child, graph, node_id)
+    #     elif isinstance(node, CompoundStmt) and node.inner:
+    #         for child in node.inner:
+    #             self.ast_to_graphviz(child, graph, node_id)
 
-        elif isinstance(node, DeclStmt) and node.inner:
-            for decl in node.inner:
-                self.ast_to_graphviz(decl, graph, node_id)
+    #     elif isinstance(node, DeclStmt) and node.inner:
+    #         for decl in node.inner:
+    #             self.ast_to_graphviz(decl, graph, node_id)
 
-        elif isinstance(node, VarDecl) and node.init:
-            if isinstance(node.init, ASTNode):
-                self.ast_to_graphviz(node.init, graph, node_id, "init")
+    #     elif isinstance(node, VarDecl) and node.init:
+    #         if isinstance(node.init, ASTNode):
+    #             self.ast_to_graphviz(node.init, graph, node_id, "init")
 
-        elif isinstance(node, BinaryOperator) and node.inner:
-            if len(node.inner) > 0:
-                self.ast_to_graphviz(node.inner[0], graph, node_id, "LHS")
-            if len(node.inner) > 1:
-                self.ast_to_graphviz(node.inner[1], graph, node_id, "RHS")
+    #     elif isinstance(node, BinaryOperator) and node.inner:
+    #         if len(node.inner) > 0:
+    #             self.ast_to_graphviz(node.inner[0], graph, node_id, "LHS")
+    #         if len(node.inner) > 1:
+    #             self.ast_to_graphviz(node.inner[1], graph, node_id, "RHS")
 
-        elif isinstance(node, ReturnStmt) and node.inner:
-            self.ast_to_graphviz(node.inner[0], graph, node_id, "value")
-        elif isinstance(node, DeclRefExpr):
-            label = f"DeclRefExpr\n{node.name}"
-            if hasattr(node, 'type') and node.type:
-                label += f"\nType: {node.type.get('qualType', 'unknown')}"
-            if node.referencedDecl:
-                label += f"\nref -> {node.referencedDecl.get('name','?')}"
-            graph.node(node_id, label=label)
-            # Link to parent if needed
-            if parent_id:
-                graph.edge(parent_id, node_id, edge_label)
+    #     elif isinstance(node, ReturnStmt) and node.inner:
+    #         self.ast_to_graphviz(node.inner[0], graph, node_id, "value")
+    #     elif isinstance(node, DeclRefExpr):
+    #         label = f"DeclRefExpr\n{node.name}"
+    #         if hasattr(node, 'type') and node.type:
+    #             label += f"\nType: {node.type.get('qualType', 'unknown')}"
+    #         if node.referencedDecl:
+    #             label += f"\nref -> {node.referencedDecl.get('name','?')}"
+    #         graph.node(node_id, label=label)
+    #         # Link to parent if needed
+    #         if parent_id:
+    #             graph.edge(parent_id, node_id, edge_label)
 
-        elif isinstance(node, ImplicitCastExpr):
-            label = f"ImplicitCastExpr"
-            if node.castKind:
-                label += f"\n({node.castKind})"
-            if hasattr(node, 'type') and node.type:
-                label += f"\nType: {node.type.get('qualType','unknown')}"
-            graph.node(node_id, label=label)
-            if parent_id:
-                graph.edge(parent_id, node_id, edge_label)
+    #     elif isinstance(node, ImplicitCastExpr):
+    #         label = f"ImplicitCastExpr"
+    #         if node.castKind:
+    #             label += f"\n({node.castKind})"
+    #         if hasattr(node, 'type') and node.type:
+    #             label += f"\nType: {node.type.get('qualType','unknown')}"
+    #         graph.node(node_id, label=label)
+    #         if parent_id:
+    #             graph.edge(parent_id, node_id, edge_label)
 
-            # Recurse
-            for child in node.inner or []:
-                self.ast_to_graphviz(child, graph, node_id)
+    #         # Recurse
+    #         for child in node.inner or []:
+    #             self.ast_to_graphviz(child, graph, node_id)
 
 
-    # --------------------
-    # DISPLAY IMG
-    # --------------------
+    # # --------------------
+    # # DISPLAY IMG
+    # # --------------------
 
-    def show_ast_image(self, root: ASTNode) -> Image:
-        """
-        Return an inline image (IPython.display.Image) for the *entire* AST.
-        """
-        dot = graphviz.Digraph(comment='AST')
-        dot.attr(rankdir='TB', splines='ortho')
-        dot.attr('node', shape='box', style='rounded,filled', 
-                 fontname='Helvetica', fillcolor='#E0E0E0')
-        dot.attr('edge', arrowsize='0.7', fontname='Helvetica')
+    # def show_ast_image(self, root: ASTNode) -> Image:
+    #     """
+    #     Return an inline image (IPython.display.Image) for the *entire* AST.
+    #     """
+    #     dot = graphviz.Digraph(comment='AST')
+    #     dot.attr(rankdir='TB', splines='ortho')
+    #     dot.attr('node', shape='box', style='rounded,filled', 
+    #              fontname='Helvetica', fillcolor='#E0E0E0')
+    #     dot.attr('edge', arrowsize='0.7', fontname='Helvetica')
         
-        # Generate the AST Graphviz representation
-        self.ast_to_graphviz(root, dot)
+    #     # Generate the AST Graphviz representation
+    #     self.ast_to_graphviz(root, dot)
         
-        # Return the inline image
-        png_data = dot.pipe(format='png')
-        return Image(png_data)
+    #     # Return the inline image
+    #     png_data = dot.pipe(format='png')
+    #     return Image(png_data)
 
-    def show_ast_image_from_function(self, func_node: ASTNode) -> Image:
-        """
-        Return an inline image (IPython.display.Image) for a *single function* subtree.
-        """
-        dot = graphviz.Digraph(comment='Function AST')
-        dot.attr(rankdir='TB', splines='ortho')
-        dot.attr('node', shape='box', style='rounded,filled', 
-                 fontname='Helvetica', fillcolor='#E0E0E0')
-        dot.attr('edge', arrowsize='0.7', fontname='Helvetica')
+    # def show_ast_image_from_function(self, func_node: ASTNode) -> Image:
+    #     """
+    #     Return an inline image (IPython.display.Image) for a *single function* subtree.
+    #     """
+    #     dot = graphviz.Digraph(comment='Function AST')
+    #     dot.attr(rankdir='TB', splines='ortho')
+    #     dot.attr('node', shape='box', style='rounded,filled', 
+    #              fontname='Helvetica', fillcolor='#E0E0E0')
+    #     dot.attr('edge', arrowsize='0.7', fontname='Helvetica')
         
-        # Generate the AST Graphviz representation for the function subtree
-        self.ast_to_graphviz(func_node, dot)
+    #     # Generate the AST Graphviz representation for the function subtree
+    #     self.ast_to_graphviz(func_node, dot)
         
-        # Return the inline image
-        png_data = dot.pipe(format='png')
-        return Image(png_data)
+    #     # Return the inline image
+    #     png_data = dot.pipe(format='png')
+    #     return Image(png_data)
 
 
 
-    # --------------------
-    # SAVE IMG
-    # --------------------
+    # # --------------------
+    # # SAVE IMG
+    # # --------------------
 
-    def save_ast_image(self, root: ASTNode, output_path: str = None) -> None:
-        """
-        Create and save a Graphviz-based AST visualization (PNG file).
-        If no output_path is provided, it saves as {basename}_ast_img.png in 'output/img_out/' directory.
-        """
-        # Ensure img_out directory exists inside the output directory
-        output_dir = os.path.join("output", "img_out")
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
+    # def save_ast_image(self, root: ASTNode, output_path: str = None) -> None:
+    #     """
+    #     Create and save a Graphviz-based AST visualization (PNG file).
+    #     If no output_path is provided, it saves as {basename}_ast_img.png in 'output/img_out/' directory.
+    #     """
+    #     # Ensure img_out directory exists inside the output directory
+    #     output_dir = os.path.join("output", "img_out")
+    #     if not os.path.exists(output_dir):
+    #         os.makedirs(output_dir)
 
-        # Use basename from JSON filename if no output_path is provided
-        if not output_path:
-            output_path = os.path.join(output_dir, f"{self.basename}_ast_img")
+    #     # Use basename from JSON filename if no output_path is provided
+    #     if not output_path:
+    #         output_path = os.path.join(output_dir, f"{self.basename}_ast_img")
 
-        dot = graphviz.Digraph(comment='AST', format='png')
-        dot.attr(rankdir='TB', splines='ortho')
-        dot.attr('node', shape='box', style='rounded,filled', 
-                fontname='Helvetica', fillcolor='#E0E0E0')
-        dot.attr('edge', arrowsize='0.7', fontname='Helvetica')
+    #     dot = graphviz.Digraph(comment='AST', format='png')
+    #     dot.attr(rankdir='TB', splines='ortho')
+    #     dot.attr('node', shape='box', style='rounded,filled', 
+    #             fontname='Helvetica', fillcolor='#E0E0E0')
+    #     dot.attr('edge', arrowsize='0.7', fontname='Helvetica')
 
-        # Generate the AST Graphviz representation
-        self.ast_to_graphviz(root, dot)
+    #     # Generate the AST Graphviz representation
+    #     self.ast_to_graphviz(root, dot)
         
-        # Render and save the image
-        dot.render(output_path, cleanup=True)
-        print(f"AST visualization saved to {output_path}.png")
+    #     # Render and save the image
+    #     dot.render(output_path, cleanup=True)
+    #     print(f"AST visualization saved to {output_path}.png")
 
 
-    def save_ast_image_from_function(self, func_node: ASTNode, output_path: str = None) -> None:
-        """
-        Create and save a Graphviz-based AST visualization *starting from the function node*.
-        If no output_path is provided, it saves as {basename}_ast_img_from_function.png in 'output/img_out/' directory.
-        """
-        # Ensure img_out directory exists inside the output directory
-        output_dir = os.path.join("output", "img_out")
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
+    # def save_ast_image_from_function(self, func_node: ASTNode, output_path: str = None) -> None:
+    #     """
+    #     Create and save a Graphviz-based AST visualization *starting from the function node*.
+    #     If no output_path is provided, it saves as {basename}_ast_img_from_function.png in 'output/img_out/' directory.
+    #     """
+    #     # Ensure img_out directory exists inside the output directory
+    #     output_dir = os.path.join("output", "img_out")
+    #     if not os.path.exists(output_dir):
+    #         os.makedirs(output_dir)
 
-        # Use basename from JSON filename if no output_path is provided
-        if not output_path:
-            output_path = os.path.join(output_dir, f"{self.basename}_ast_img_from_function")
+    #     # Use basename from JSON filename if no output_path is provided
+    #     if not output_path:
+    #         output_path = os.path.join(output_dir, f"{self.basename}_ast_img_from_function")
 
-        dot = graphviz.Digraph(comment='Function AST', format='png')
-        dot.attr(rankdir='TB', splines='ortho')
-        dot.attr('node', shape='box', style='rounded,filled', 
-                fontname='Helvetica', fillcolor='#E0E0E0')
-        dot.attr('edge', arrowsize='0.7', fontname='Helvetica')
+    #     dot = graphviz.Digraph(comment='Function AST', format='png')
+    #     dot.attr(rankdir='TB', splines='ortho')
+    #     dot.attr('node', shape='box', style='rounded,filled', 
+    #             fontname='Helvetica', fillcolor='#E0E0E0')
+    #     dot.attr('edge', arrowsize='0.7', fontname='Helvetica')
 
-        # Generate the AST Graphviz representation starting from the function node
-        self.ast_to_graphviz(func_node, dot)
+    #     # Generate the AST Graphviz representation starting from the function node
+    #     self.ast_to_graphviz(func_node, dot)
 
-        # Render and save the image
-        dot.render(output_path, cleanup=True)
-        print(f"Function-only AST visualization saved to {output_path}.png")
+    #     # Render and save the image
+    #     dot.render(output_path, cleanup=True)
+    #     print(f"Function-only AST visualization saved to {output_path}.png")
 
 
     # --------------------
