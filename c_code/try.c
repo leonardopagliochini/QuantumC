@@ -22,14 +22,3 @@ int main() {
     return 0;
 }
 
-
-    // // Print all variables for comparison
-    // printf("a = %d\n", a);
-    // printf("b = %d\n", b);
-    // printf("c = %d\n", c);
-    // printf("genova = %d\n", genova);
-    // printf("d = %d\n", d);
-    // printf("e = %d\n", e);
-    // printf("f = %d\n", f);
-    // printf("g = %d\n", g);
-    // printf("qst = %d\n", qst);
