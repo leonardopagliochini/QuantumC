@@ -204,8 +204,15 @@ def pretty_print_expression(expr: Expression) -> str:
         lhs = pretty_print_expression(expr.lhs)
         rhs = pretty_print_expression(expr.rhs)
         return f"({lhs} {expr.opcode} {rhs})"
+    elif isinstance(expr, BinaryOperatorWithImmediate):
+        lhs = pretty_print_expression(expr.lhs)
+        rhs = pretty_print_expression(expr.rhs)  # assumed to be IntegerLiteral
+        return f"({lhs} {expr.opcode} {rhs})"
     else:
         return "<unsupported_expr>"
+
+    
+    
 from xdsl.ir import SSAValue, Attribute
 from xdsl.dialects.builtin import IntegerAttr, i32
 from xdsl.irdl import (
@@ -217,6 +224,7 @@ from xdsl.irdl import (
     prop_def,
     traits_def,
 )
+
 from xdsl.traits import Pure
 from xdsl.utils.exceptions import VerifyException
 from xdsl.dialects.builtin import IntegerType, IndexType, AnyOf
