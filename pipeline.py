@@ -244,9 +244,7 @@ class SignlessIntegerBinaryOpWithImmediate(IRDLOperation):
     imm = prop_def(IntegerAttr)
 
     traits = traits_def(Pure())
-
-    assembly_format = "$lhs `,` $imm attr-dict `:` type($result)"
-
+    
     def __init__(
         self,
         lhs: SSAValue,
@@ -300,11 +298,6 @@ class SignlessIntegerBinaryOpWithImmediateAndOverflow(SignlessIntegerBinaryOpWit
         IntegerOverflowAttr,
         default_value=IntegerOverflowAttr("none"),
         prop_name="overflowFlags",
-    )
-
-    # Note: this extends the parent assembly format
-    assembly_format = (
-        "$lhs `,` $imm (`overflow` `` $overflowFlags^)? attr-dict `:` type($result)"
     )
 
     def __init__(
