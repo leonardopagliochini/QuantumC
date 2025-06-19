@@ -560,26 +560,28 @@ from xdsl.printer import Printer
 # QuantumIR - Updated for full pipeline
 # =============================================================================
 
-class QuantumIR():
+
+class QuantumIR:
     """
     Compilation pipeline using C AST JSON and custom IR generator.
-
     Steps:
     1. Parse JSON → Python Dataclasses
     2. Generate MLIR IR from dataclasses
     3. Visualize MLIR IR
     """
 
-    # --- Configuration ---
-    json_path: str = 'json_out/try.json'
-    output_dir: str = 'output'
+    def __init__(self, json_path: str = "json_out/try.json", output_dir: str = "output"):
+        self.json_path = json_path
+        self.output_dir = output_dir
+        self.root: TranslationUnit = None
+        self.module: ModuleOp = None
 
-    # --- Internal State ---
-    root: TranslationUnit = None
-    module: ModuleOp = None
+        # Check input file exists
+        if not os.path.exists(self.json_path):
+            raise FileNotFoundError(f"Input JSON file not found: {self.json_path}")
 
-    def __init__(self):
-        pass
+        # Create output directory if it doesn't exist
+        os.makedirs(self.output_dir, exist_ok=True)
 
     def run_dataclass(self):
         """Step 1: Parse JSON into structured dataclass AST."""
@@ -588,7 +590,7 @@ class QuantumIR():
 
         self.root = parse_ast(ast_json)
         print("AST successfully parsed into dataclasses.")
-    
+
     def pretty_print_source(self):
         """Optional: Reconstruct original C-like source from dataclasses."""
         if self.root is None:
@@ -598,7 +600,6 @@ class QuantumIR():
         print("=== Pretty Printed C Source ===")
         print(source_code)
         print("=" * 35)
-
 
     def run_generate_ir(self):
         """Step 2: Convert dataclass AST into xDSL MLIR."""
@@ -622,11 +623,6 @@ class QuantumIR():
         printer = Printer()
         printer.print_op(self.module)
         print()
-    
-
-
-
-
 
 # =============================================================================
 # Entry Point (CLI Execution)
@@ -640,13 +636,17 @@ if __name__ == "__main__":
     3. Print the IR
     """
     try:
-        quantum_ir = QuantumIR()
+        # Use CLI argument if present, otherwise default
+        input_json_path = sys.argv[1] if len(sys.argv) > 1 else "json_out/try.json"
+
+        quantum_ir = QuantumIR(json_path=input_json_path)
         print()
         quantum_ir.run_dataclass()
         print()
         quantum_ir.pretty_print_source()
         quantum_ir.run_generate_ir()
         quantum_ir.visualize_ir()
+
     except Exception as e:
         print("Error in the execution of the program:", e)
         raise
