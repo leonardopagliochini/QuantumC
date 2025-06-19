@@ -29,7 +29,7 @@ def astJsonGen(input_dir="c_code"):
         json_output_path = os.path.join(json_out_folder, f'{base_name}.json')
 
         # Run clang to generate AST in JSON format
-        clang_ast_cmd_json = f'clang -Xclang -ast-dump=json -fsyntax-only {c_file_path} > {json_output_path}'
+        clang_ast_cmd_json = f'clang -Xclang -ast-dump=json -g -fsyntax-only {c_file_path} > {json_output_path}'
         subprocess.run(clang_ast_cmd_json, shell=True, check=True)
 
         # Verify if the JSON output file was successfully created
