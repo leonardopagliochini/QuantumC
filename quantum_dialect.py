@@ -71,28 +71,28 @@ class QuantumBinaryBase(IRDLOperation, abc.ABC):
 class QAddiOp(QuantumBinaryBase):
     """Quantum addition operation."""
 
-    name = "quant.addi"
+    name = "quantum.addi"
 
 
 @irdl_op_definition
 class QSubiOp(QuantumBinaryBase):
     """Quantum subtraction operation."""
 
-    name = "quant.subi"
+    name = "quantum.subi"
 
 
 @irdl_op_definition
 class QMuliOp(QuantumBinaryBase):
     """Quantum multiplication operation."""
 
-    name = "quant.muli"
+    name = "quantum.muli"
 
 
 @irdl_op_definition
 class QDivSOp(QuantumBinaryBase):
     """Quantum signed division operation."""
 
-    name = "quant.divsi"
+    name = "quantum.divsi"
 
 
 class QuantumBinaryImmBase(IRDLOperation, abc.ABC):
@@ -140,25 +140,25 @@ class QuantumBinaryImmBase(IRDLOperation, abc.ABC):
 class QAddiImmOp(QuantumBinaryImmBase):
     """Addition with an immediate value."""
 
-    name = "quant.addi_imm"
+    name = "quantum.addi_imm"
 
 
 @irdl_op_definition
 class QSubiImmOp(QuantumBinaryImmBase):
     """Subtraction with an immediate value."""
 
-    name = "quant.subi_imm"
+    name = "quantum.subi_imm"
 
 
 @irdl_op_definition
 class QMuliImmOp(QuantumBinaryImmBase):
     """Multiplication with an immediate value."""
 
-    name = "quant.muli_imm"
+    name = "quantum.muli_imm"
 
 
 @irdl_op_definition
 class QDivSImmOp(QuantumBinaryImmBase):
     """Signed division with an immediate value."""
 
-    name = "quant.divsi_imm"
+    name = "quantum.divsi_imm"

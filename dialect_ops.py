@@ -48,7 +48,7 @@ signlessIntegerLike = AnyOf([IntegerType, IndexType])
 class SignlessIntegerBinaryOpWithImmediate(IRDLOperation, abc.ABC):
     """Base class for binary operations that take an immediate value."""
 
-    name = "mydialect.binary_imm"
+    name = "iarith.binary_imm"
 
     T: ClassVar = VarConstraint("T", signlessIntegerLike)
     lhs = operand_def(T)
@@ -117,7 +117,7 @@ class SignlessIntegerBinaryOpWithImmediate(IRDLOperation, abc.ABC):
 class SignlessIntegerBinaryOpWithImmediateAndOverflow(SignlessIntegerBinaryOpWithImmediate, abc.ABC):
     """Variant supporting overflow flags."""
 
-    name = "mydialect.binary_imm_overflow"
+    name = "iarith.binary_imm_overflow"
 
     # Optional overflow behavior encoded as a property.
     overflow_flags = prop_def(IntegerOverflowAttr, default_value=IntegerOverflowAttr("none"), prop_name="overflowFlags")
@@ -174,7 +174,7 @@ class SignlessIntegerBinaryOpWithImmediateAndOverflow(SignlessIntegerBinaryOpWit
 class AddiImmOp(SignlessIntegerBinaryOpWithImmediateAndOverflow):
     """Addition with immediate."""
 
-    name = "mydialect.addi_imm"
+    name = "iarith.addi_imm"
     traits = traits_def(Pure())
 
     @staticmethod
@@ -197,7 +197,7 @@ class AddiImmOp(SignlessIntegerBinaryOpWithImmediateAndOverflow):
 class SubiImmOp(SignlessIntegerBinaryOpWithImmediateAndOverflow):
     """Subtraction with immediate."""
 
-    name = "mydialect.subi_imm"
+    name = "iarith.subi_imm"
     traits = traits_def(Pure())
 
     @staticmethod
@@ -220,7 +220,7 @@ class SubiImmOp(SignlessIntegerBinaryOpWithImmediateAndOverflow):
 class MuliImmOp(SignlessIntegerBinaryOpWithImmediateAndOverflow):
     """Multiplication with immediate."""
 
-    name = "mydialect.muli_imm"
+    name = "iarith.muli_imm"
     traits = traits_def(Pure())
 
     @staticmethod
@@ -243,7 +243,7 @@ class MuliImmOp(SignlessIntegerBinaryOpWithImmediateAndOverflow):
 class DivSImmOp(SignlessIntegerBinaryOpWithImmediateAndOverflow):
     """Signed division with immediate."""
 
-    name = "mydialect.divsi_imm"
+    name = "iarith.divsi_imm"
     traits = traits_def(Pure())
 
     @staticmethod

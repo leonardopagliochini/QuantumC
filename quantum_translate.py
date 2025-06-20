@@ -155,10 +155,10 @@ class QuantumTranslator:
         # Binary operations with an immediate operand only need to recompute the
         # non-immediate side.
         elif op.name in (
-            "mydialect.addi_imm",
-            "mydialect.subi_imm",
-            "mydialect.muli_imm",
-            "mydialect.divsi_imm",
+            "iarith.addi_imm",
+            "iarith.subi_imm",
+            "iarith.muli_imm",
+            "iarith.divsi_imm",
         ):
             cost = 1 + self.compute_cost(op.operands[0])
 
@@ -409,17 +409,17 @@ class QuantumTranslator:
                 self.reg_ssa[reg] = new_op.results[0]
                 self.val_info[op.results[0]] = ValueInfo(reg, version, ("binary", (opcode, lhs, rhs, target)))
 
-            elif op.name in ("mydialect.addi_imm", "mydialect.subi_imm", "mydialect.muli_imm", "mydialect.divsi_imm"):
+            elif op.name in ("iarith.addi_imm", "iarith.subi_imm", "iarith.muli_imm", "iarith.divsi_imm"):
                 # Binary operation where one operand is an immediate integer.
                 (lhs,) = op.operands
                 imm = int(op.imm.value.data)
                 remaining[lhs] -= 1
                 q_lhs = self.emit_value(lhs)
                 opcode = {
-                    "mydialect.addi_imm": "add",
-                    "mydialect.subi_imm": "sub",
-                    "mydialect.muli_imm": "mul",
-                    "mydialect.divsi_imm": "div",
+                    "iarith.addi_imm": "add",
+                    "iarith.subi_imm": "sub",
+                    "iarith.muli_imm": "mul",
+                    "iarith.divsi_imm": "div",
                 }[op.name]
                 new_op = self.create_binary_imm_op(opcode, q_lhs, imm)
                 self.current_block.add_op(new_op)
