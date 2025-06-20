@@ -2,6 +2,8 @@
 # Custom IRDL Operations for Immediate Arithmetic
 # =============================================================================
 
+"""IRDL operation definitions for arithmetic ops with immediate values."""
+
 from __future__ import annotations
 import abc
 from typing import ClassVar
@@ -34,7 +36,7 @@ signlessIntegerLike = AnyOf([IntegerType, IndexType])
 # -----------------------------------------------------------------------------
 
 class SignlessIntegerBinaryOpWithImmediate(IRDLOperation, abc.ABC):
-    """Base class for ops like `%res = %lhs op imm`."""
+    """Base class for binary operations that take an immediate value."""
 
     name = "mydialect.binary_imm"
 
@@ -47,6 +49,7 @@ class SignlessIntegerBinaryOpWithImmediate(IRDLOperation, abc.ABC):
     assembly_format = "$lhs `,` $imm attr-dict `:` type($lhs)"
 
     def __init__(self, lhs: SSAValue, imm: int | IntegerAttr, result_type: Attribute | None = None):
+        """Create the operation with ``lhs`` and an immediate value."""
         if isinstance(imm, int):
             imm = IntegerAttr(imm, lhs.type)
         if result_type is None:
@@ -54,6 +57,7 @@ class SignlessIntegerBinaryOpWithImmediate(IRDLOperation, abc.ABC):
         super().__init__(operands=[lhs], result_types=[result_type], properties={"imm": imm})
 
     def verify_(self):
+        """Check that the immediate has the same type as the operand."""
         if not isinstance(self.imm, IntegerAttr):
             raise VerifyException("Immediate must be an IntegerAttr")
         if self.lhs.type != self.imm.type:
@@ -61,14 +65,17 @@ class SignlessIntegerBinaryOpWithImmediate(IRDLOperation, abc.ABC):
 
     @staticmethod
     def py_operation(lhs: int, imm: int) -> int | None:
+        """Pure Python implementation of the operation used for testing."""
         return None
 
     @staticmethod
     def is_right_zero(attr: IntegerAttr) -> bool:
+        """Return ``True`` if the immediate is a right identity for zero."""
         return False
 
     @staticmethod
     def is_right_unit(attr: IntegerAttr) -> bool:
+        """Return ``True`` if the immediate is a right identity for one."""
         return False
 
 
@@ -80,7 +87,14 @@ class SignlessIntegerBinaryOpWithImmediateAndOverflow(SignlessIntegerBinaryOpWit
     overflow_flags = prop_def(IntegerOverflowAttr, default_value=IntegerOverflowAttr("none"), prop_name="overflowFlags")
     assembly_format = "$lhs `,` $imm (`overflow` `` $overflowFlags^)? attr-dict `:` type($lhs)"
 
-    def __init__(self, lhs: SSAValue, imm: int | IntegerAttr, result_type: Attribute | None = None, overflow: IntegerOverflowAttr = IntegerOverflowAttr("none")):
+    def __init__(
+        self,
+        lhs: SSAValue,
+        imm: int | IntegerAttr,
+        result_type: Attribute | None = None,
+        overflow: IntegerOverflowAttr = IntegerOverflowAttr("none"),
+    ):
+        """Create the operation with overflow semantics."""
         if isinstance(imm, int):
             imm = IntegerAttr(imm, lhs.type)
         if result_type is None:
@@ -102,14 +116,17 @@ class AddiImmOp(SignlessIntegerBinaryOpWithImmediateAndOverflow):
 
     @staticmethod
     def py_operation(lhs: int, imm: int) -> int:
+        """Return ``lhs`` plus ``imm``."""
         return lhs + imm
 
     @staticmethod
     def is_right_zero(attr: IntegerAttr) -> bool:
+        """Check if ``imm`` equals zero."""
         return attr.value.data == 0
 
     @staticmethod
     def is_right_unit(attr: IntegerAttr) -> bool:
+        """Check if ``imm`` is the additive identity (zero)."""
         return attr.value.data == 0
 
 
@@ -122,14 +139,17 @@ class SubiImmOp(SignlessIntegerBinaryOpWithImmediateAndOverflow):
 
     @staticmethod
     def py_operation(lhs: int, imm: int) -> int:
+        """Return ``lhs`` minus ``imm``."""
         return lhs - imm
 
     @staticmethod
     def is_right_zero(attr: IntegerAttr) -> bool:
+        """Check if ``imm`` is zero."""
         return attr.value.data == 0
 
     @staticmethod
     def is_right_unit(attr: IntegerAttr) -> bool:
+        """Check if ``imm`` is zero."""
         return attr.value.data == 0
 
 
@@ -142,14 +162,17 @@ class MuliImmOp(SignlessIntegerBinaryOpWithImmediateAndOverflow):
 
     @staticmethod
     def py_operation(lhs: int, imm: int) -> int:
+        """Return ``lhs`` multiplied by ``imm``."""
         return lhs * imm
 
     @staticmethod
     def is_right_zero(attr: IntegerAttr) -> bool:
+        """Check if ``imm`` is zero."""
         return attr.value.data == 0
 
     @staticmethod
     def is_right_unit(attr: IntegerAttr) -> bool:
+        """Check if ``imm`` equals one."""
         return attr.value.data == 1
 
 
@@ -162,15 +185,18 @@ class DivSImmOp(SignlessIntegerBinaryOpWithImmediateAndOverflow):
 
     @staticmethod
     def py_operation(lhs: int, imm: int) -> int | None:
+        """Return ``lhs`` divided by ``imm`` or ``None`` if dividing by zero."""
         if imm == 0:
             return None
         return lhs // imm
 
     @staticmethod
     def is_right_zero(attr: IntegerAttr) -> bool:
+        """Division has no zero identity on the right."""
         return False
 
     @staticmethod
     def is_right_unit(attr: IntegerAttr) -> bool:
+        """Check if ``imm`` equals one."""
         return attr.value.data == 1
 

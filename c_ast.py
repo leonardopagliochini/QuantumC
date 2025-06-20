@@ -2,6 +2,8 @@
 # AST Node Definitions and Parsing Utilities
 # =============================================================================
 
+"""Dataclasses representing a tiny C-like language and parsing helpers."""
+
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Union
 
@@ -17,16 +19,22 @@ class Expression:
 
 @dataclass
 class IntegerLiteral(Expression):
+    """Integer constant."""
+
     value: int
 
 
 @dataclass
 class DeclRef(Expression):
+    """Reference to a previously declared variable."""
+
     name: str
 
 
 @dataclass
 class BinaryOperator(Expression):
+    """Binary operation between ``lhs`` and ``rhs``."""
+
     opcode: str
     lhs: Expression
     rhs: Expression
@@ -34,6 +42,8 @@ class BinaryOperator(Expression):
 
 @dataclass
 class BinaryOperatorWithImmediate(Expression):
+    """Binary operation where one side is an immediate."""
+
     opcode: str
     lhs: Expression
     rhs: Expression
@@ -41,28 +51,38 @@ class BinaryOperatorWithImmediate(Expression):
 
 @dataclass
 class VarDecl:
+    """Variable declaration optionally with initialization."""
+
     name: str
     init: Optional[Expression] = None
 
 
 @dataclass
 class ReturnStmt:
+    """Return statement with optional value."""
+
     value: Optional[Expression] = None
 
 
 @dataclass
 class AssignStmt:
+    """Assignment of ``value`` to variable ``name``."""
+
     name: str
     value: Expression
 
 
 @dataclass
 class CompoundStmt:
+    """Sequence of statements forming a block."""
+
     stmts: List[Union[VarDecl, ReturnStmt, AssignStmt]] = field(default_factory=list)
 
 
 @dataclass
 class FunctionDecl:
+    """Function definition."""
+
     name: str
     body: CompoundStmt
     params: List[str] = field(default_factory=list)
@@ -70,6 +90,8 @@ class FunctionDecl:
 
 @dataclass
 class TranslationUnit:
+    """Top-level container of all functions."""
+
     decls: List[FunctionDecl] = field(default_factory=list)
 
 

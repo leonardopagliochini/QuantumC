@@ -2,6 +2,8 @@
 # MLIR Generator
 # =============================================================================
 
+"""Convert a simple C-like AST into MLIR using xDSL."""
+
 from __future__ import annotations
 
 from xdsl.ir import Block, Region, SSAValue
@@ -32,6 +34,7 @@ class MLIRGenerator:
     """Translate the dataclass AST into xDSL operations."""
 
     def __init__(self) -> None:
+        """Initialize generator state."""
         self.symbol_table: dict[str, SSAValue | None] = {}
         self.current_block: Block | None = None
 
