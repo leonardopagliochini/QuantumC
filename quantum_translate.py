@@ -205,6 +205,7 @@ class QuantumTranslator:
         # version.
         if self.reg_version[reg] != info.version:
             self.recompute(val)
+            reg = info.reg
 
         # Return the SSA value associated with the current contents of the
         # register.
