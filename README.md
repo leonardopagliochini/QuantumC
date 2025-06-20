@@ -42,7 +42,7 @@ The supporting modules are:
 - **astJsonGen.py** – helper invoking Clang to create JSON AST files.
 - **c_ast.py** – dataclasses representing the AST and utilities for parsing and pretty printing.
 - **mlir_generator.py** – lowers the dataclasses to standard MLIR operations and includes helper ops defined in `dialect_ops.py`.
-- **quantum_translate.py** – converts classical arithmetic operations to quantum operations defined in `quantum_dialect.py` while keeping track of virtual quantum registers.
+- **quantum_translate.py** – converts classical arithmetic operations to quantum operations defined in `quantum_dialect.py`.
 - **run_all_pipeline.py** – convenience script that runs the pipeline over every JSON file and writes the resulting MLIR to `mlir_out/`.
 
 ## Code Layout
