@@ -16,6 +16,7 @@ from xdsl.dialects.arith import ConstantOp, SubiOp, AddiOp, MuliOp, DivSIOp
 from xdsl.printer import Printer
 
 
+
 # =============================================================================
 # AST Node Definitions
 # =============================================================================
@@ -780,10 +781,11 @@ class QuantumIR:
     """
 
     def __init__(self, json_path: str = "json_out/try.json", output_dir: str = "output"):
-        self.json_path = json_path                      # Path to JSON input
-        self.output_dir = output_dir                    # Folder to emit outputs
-        self.root: TranslationUnit = None               # Root of parsed AST (dataclasses)
-        self.module: ModuleOp = None                    # Final IR Module
+        self.json_path = json_path
+        self.output_dir = output_dir
+        self.root: TranslationUnit = None
+        self.module: ModuleOp = None
+        self.quantum_module: ModuleOp | None = None
 
         # ---------------------------------------------------------------------
         # File system setup
@@ -860,6 +862,24 @@ class QuantumIR:
         printer.print_op(self.module)
         print()
 
+    def run_generate_quantum_ir(self):
+        """Translate the previously generated MLIR into the quantum dialect."""
+        if self.module is None:
+            raise RuntimeError("Must call run_generate_ir() first")
+
+        from quantum_translate import QuantumTranslator
+        translator = QuantumTranslator(self.module)
+        self.quantum_module = translator.translate()
+        print("Quantum MLIR successfully generated.")
+
+    def visualize_quantum_ir(self):
+        if self.quantum_module is None:
+            raise RuntimeError("Must call run_generate_quantum_ir() first")
+
+        printer = Printer()
+        printer.print_op(self.quantum_module)
+        print()
+
 
 # =============================================================================
 # Entry Point (CLI Execution)
@@ -890,12 +910,15 @@ if __name__ == "__main__":
         # Run Compilation Pipeline
         # ---------------------------------------------------------------------
         quantum_ir = QuantumIR(json_path=input_json_path)
-        print()                                     # Visual spacer
-        quantum_ir.run_dataclass()                  # Step 1: Parse AST
-        print()                                     # Visual spacer
-        quantum_ir.pretty_print_source()            # Optional: C-like print
-        quantum_ir.run_generate_ir()                # Step 2: Generate IR
-        quantum_ir.visualize_ir()                   # Step 3: Print IR
+        print()
+        quantum_ir.run_dataclass()
+        print()
+        quantum_ir.pretty_print_source()
+        quantum_ir.run_generate_ir()
+        quantum_ir.visualize_ir()
+        quantum_ir.run_generate_quantum_ir()
+        quantum_ir.visualize_quantum_ir()
+
 
     except Exception as e:
         # Catch and show any runtime errors
