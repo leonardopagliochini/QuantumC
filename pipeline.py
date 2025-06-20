@@ -50,6 +50,8 @@ class QuantumIR:
         self.module: ModuleOp | None = None
         # MLIR module for quantum MLIR
         self.quantum_module: ModuleOp | None = None
+        # Last quantum translator used
+        self.translator: "QuantumTranslator | None" = None
 
         if not os.path.exists(self.json_path):
             raise FileNotFoundError(f"Input JSON file not found: {self.json_path}")
@@ -128,9 +130,10 @@ class QuantumIR:
             raise RuntimeError("Must call run_generate_ir first")
         from quantum_translate import QuantumTranslator
         # Run the translator to produce quantum-specific operations.
-        translator = QuantumTranslator(self.module)
-        self.quantum_module = translator.translate()
+        self.translator = QuantumTranslator(self.module)
+        self.quantum_module = self.translator.translate()
         print("Quantum MLIR successfully generated.")
+        print(self.translator.dump_registers())
 
     def visualize_quantum_ir(self) -> None:
         """Print the MLIR generated for the quantum dialect."""

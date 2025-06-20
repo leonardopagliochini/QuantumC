@@ -8,7 +8,7 @@ when necessary and attempting to reuse registers when possible.
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Tuple, Any
 
 # xdsl imports used to manipulate MLIR operations and types
@@ -53,6 +53,18 @@ class ValueInfo:
     version: int
     expr: Any
 
+
+@dataclass
+class QuantumRegister:
+    """Represent a quantum register through time."""
+
+    reg_id: int
+    history: list[tuple[int, str]] = field(default_factory=list)
+
+    def record(self, version: int, expr: str) -> None:
+        """Add a new entry describing ``expr`` stored at ``version``."""
+        self.history.append((version, expr))
+
 class QuantumTranslator:
     """Translate standard MLIR to quantum-friendly dialect."""
 
@@ -75,6 +87,12 @@ class QuantumTranslator:
         # ``next_reg`` stores the number of the next free quantum register.
         # Registers are identified by an integer and are allocated sequentially.
         self.next_reg = 0
+
+        # Objects tracking the history of each allocated register.
+        self.registers: Dict[int, QuantumRegister] = {}
+
+        # Human readable expression associated with every SSA value.
+        self.value_expr: Dict[SSAValue, str] = {}
 
         # Mapping from SSA values in the original module to ``ValueInfo``
         # records.  These records describe which register currently contains the
@@ -179,7 +197,7 @@ class QuantumTranslator:
         return self.use_count.get(val, 0)
 
     # ------------------------------------------------------------------
-    def allocate_reg(self) -> int:
+    def allocate_reg(self, initial_expr: str | None = None) -> int:
         """Allocate a new quantum register identifier."""
 
         # Registers are numbered sequentially. ``next_reg`` always points to the
@@ -189,6 +207,9 @@ class QuantumTranslator:
 
         # Start the version counter for the new register at zero.
         self.reg_version[r] = 0
+        self.registers[r] = QuantumRegister(r)
+        if initial_expr is not None:
+            self.registers[r].record(0, initial_expr)
         return r
 
     # ------------------------------------------------------------------
@@ -229,7 +250,7 @@ class QuantumTranslator:
             # Allocate a fresh register so that we do not overwrite the
             # previous value. Quantum registers cannot be reset in place without
             # destroying information.
-            reg = self.allocate_reg()
+            reg = self.allocate_reg(str(value))
 
             # Emit the initialization of the new register with the constant
             # value.
@@ -245,6 +266,7 @@ class QuantumTranslator:
             # value lives.
             info.version = version
             info.reg = reg
+            self.registers[reg].record(version, str(value))
 
         elif expr[0] == "binary":
             # ``val`` was produced by a binary operation with two operands.
@@ -274,6 +296,8 @@ class QuantumTranslator:
             self.reg_version[reg] = version
             self.reg_ssa[reg] = op.results[0]
             info.version = version
+            expr_str = f"({self.value_expr[lhs]} {opcode} {self.value_expr[rhs]})"
+            self.registers[reg].record(version, expr_str)
 
         elif expr[0] == "binaryimm":
             # ``val`` came from a binary operation with an immediate operand.
@@ -290,6 +314,8 @@ class QuantumTranslator:
             self.reg_version[reg] = version
             self.reg_ssa[reg] = op.results[0]
             info.version = version
+            expr_str = f"({self.value_expr[lhs]} {opcode} {imm})"
+            self.registers[reg].record(version, expr_str)
 
         else:
             raise NotImplementedError
@@ -351,12 +377,14 @@ class QuantumTranslator:
         for op in block.ops:
             if isinstance(op, ConstantOp):
                 # Constants simply allocate a new register and initialize it.
-                reg = self.allocate_reg()
+                const_expr = str(op.value.value.data)
+                reg = self.allocate_reg(const_expr)
                 init_op = QuantumInitOp(op.value.value.data)
                 self.current_block.add_op(init_op)
                 init_op.results[0].name_hint = f"q{reg}_0"
                 self.val_info[op.results[0]] = ValueInfo(reg, 0, ("const", op.value.value.data))
                 self.reg_ssa[reg] = init_op.results[0]
+                self.value_expr[op.results[0]] = const_expr
 
             elif isinstance(op, (AddiOp, SubiOp, MuliOp, DivSIOp)):
                 # Binary arithmetic operation with two SSA operands.
@@ -408,6 +436,9 @@ class QuantumTranslator:
                 self.reg_version[reg] = version
                 self.reg_ssa[reg] = new_op.results[0]
                 self.val_info[op.results[0]] = ValueInfo(reg, version, ("binary", (opcode, lhs, rhs, target)))
+                expr_str = f"({self.value_expr[lhs]} {opcode} {self.value_expr[rhs]})"
+                self.value_expr[op.results[0]] = expr_str
+                self.registers[reg].record(version, expr_str)
 
             elif op.name in ("iarith.addi_imm", "iarith.subi_imm", "iarith.muli_imm", "iarith.divsi_imm"):
                 # Binary operation where one operand is an immediate integer.
@@ -429,6 +460,9 @@ class QuantumTranslator:
                 self.reg_version[reg] = version
                 self.reg_ssa[reg] = new_op.results[0]
                 self.val_info[op.results[0]] = ValueInfo(reg, version, ("binaryimm", (opcode, lhs, imm)))
+                expr_str = f"({self.value_expr[lhs]} {opcode} {imm})"
+                self.value_expr[op.results[0]] = expr_str
+                self.registers[reg].record(version, expr_str)
 
             elif isinstance(op, ReturnOp):
                 # Return statements are forwarded directly after materializing
@@ -448,3 +482,14 @@ class QuantumTranslator:
         # containing the newly built block of quantum operations.
         func_type = ([i32] * len(func.function_type.inputs.data), [i32])
         return FuncOp(func.sym_name.data, func_type, Region([self.current_block]))
+
+    # ------------------------------------------------------------------
+    def dump_registers(self) -> str:
+        """Return a string describing the register evolution."""
+
+        lines = []
+        for reg_id in sorted(self.registers):
+            lines.append(f"Register {reg_id}:")
+            for version, expr in self.registers[reg_id].history:
+                lines.append(f"  v{version}: {expr}")
+        return "\n".join(lines)
