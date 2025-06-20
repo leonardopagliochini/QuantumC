@@ -11,6 +11,7 @@ from xdsl.dialects.func import FuncOp
 from xdsl.dialects.arith import ConstantOp, SubiOp, AddiOp, MuliOp, DivSIOp
 from xdsl.printer import Printer
 
+
 # === AST Classes ===
 
 class Expression:
@@ -581,6 +582,7 @@ class QuantumIR:
         self.output_dir = output_dir
         self.root: TranslationUnit = None
         self.module: ModuleOp = None
+        self.quantum_module: ModuleOp | None = None
 
         # Check input file exists
         if not os.path.exists(self.json_path):
@@ -630,6 +632,24 @@ class QuantumIR:
         printer.print_op(self.module)
         print()
 
+    def run_generate_quantum_ir(self):
+        """Translate the previously generated MLIR into the quantum dialect."""
+        if self.module is None:
+            raise RuntimeError("Must call run_generate_ir() first")
+
+        from quantum_translate import QuantumTranslator
+        translator = QuantumTranslator(self.module)
+        self.quantum_module = translator.translate()
+        print("Quantum MLIR successfully generated.")
+
+    def visualize_quantum_ir(self):
+        if self.quantum_module is None:
+            raise RuntimeError("Must call run_generate_quantum_ir() first")
+
+        printer = Printer()
+        printer.print_op(self.quantum_module)
+        print()
+
 # =============================================================================
 # Entry Point (CLI Execution)
 # =============================================================================
@@ -652,6 +672,8 @@ if __name__ == "__main__":
         quantum_ir.pretty_print_source()
         quantum_ir.run_generate_ir()
         quantum_ir.visualize_ir()
+        quantum_ir.run_generate_quantum_ir()
+        quantum_ir.visualize_quantum_ir()
 
     except Exception as e:
         print("Error in the execution of the program:", e)
