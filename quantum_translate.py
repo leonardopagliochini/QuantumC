@@ -90,8 +90,17 @@ class QuantumTranslator:
         # its contents in the quantum module being built.
         self.reg_ssa: Dict[int, SSAValue] = {}
 
+        # Track which original SSA value currently occupies each register. This
+        # is required so that ``recompute`` can determine if overwriting a
+        # register would destroy a value that is still needed.
+        self.reg_owner: Dict[int, SSAValue] = {}
+
         # Number of remaining uses for every SSA value in the original module.
         self.use_count: Dict[SSAValue, int] = {}
+
+        # Remaining use counts updated while translating a function. Populated
+        # in :meth:`translate_func` and consulted during recomputation.
+        self.remaining: Dict[SSAValue, int] | None = None
 
         # Cache used by ``compute_cost`` to memoize recomputation costs.
         self.cost_cache: Dict[SSAValue, int] = {}
@@ -218,17 +227,26 @@ class QuantumTranslator:
         info = self.val_info[val]
         expr = info.expr
 
+        # Determine whether overwriting ``info.reg`` would clobber a value that
+        # still has remaining uses.  If so we allocate a fresh register for the
+        # recomputed value instead.
+        reg = info.reg
+        current = self.reg_owner.get(reg)
+        need_new = False
+        if current is not None and current is not val and self.remaining is not None:
+            if self.remaining.get(current, 0) > 0:
+                need_new = True
+        version = self.reg_version[reg] + 1
+        if need_new:
+            reg = self.allocate_reg()
+
         # ``expr`` is a tuple describing how ``val`` was originally produced.
         # The first element selects the kind of expression.
         if expr[0] == "const":
-            # The value was produced by a constant operation.
+            # The value was produced by a constant operation. Constants always
+            # materialize into a fresh register since their original storage may
+            # have been clobbered.
             value = expr[1]
-            reg = info.reg
-            version = self.reg_version[reg] + 1
-
-            # Allocate a fresh register so that we do not overwrite the
-            # previous value. Quantum registers cannot be reset in place without
-            # destroying information.
             reg = self.allocate_reg()
 
             # Emit the initialization of the new register with the constant
@@ -240,6 +258,7 @@ class QuantumTranslator:
             op.results[0].name_hint = f"q{reg}_{version}"
             self.reg_version[reg] = version
             self.reg_ssa[reg] = op.results[0]
+            self.reg_owner[reg] = val
 
             # Update the stored ``ValueInfo`` so future uses know where the
             # value lives.
@@ -258,38 +277,34 @@ class QuantumTranslator:
             if target is rhs:
                 first = q_rhs
                 second = q_lhs
-                reg = self.val_info[rhs].reg
             else:
                 first = q_lhs
                 second = q_rhs
-                reg = self.val_info[lhs].reg
 
             # Emit the appropriate quantum binary operation.
             op = self.create_binary_op(opcode, first, second)
             self.current_block.add_op(op)
 
-            # Update bookkeeping for the target register.
-            version = self.reg_version[reg] + 1
             op.results[0].name_hint = f"q{reg}_{version}"
             self.reg_version[reg] = version
             self.reg_ssa[reg] = op.results[0]
+            self.reg_owner[reg] = val
             info.version = version
+            info.reg = reg
 
         elif expr[0] == "binaryimm":
             # ``val`` came from a binary operation with an immediate operand.
             opcode, lhs, imm = expr[1]
             q_lhs = self.emit_value(lhs)
-            reg = self.val_info[lhs].reg
             op = self.create_binary_imm_op(opcode, q_lhs, imm)
             self.current_block.add_op(op)
 
-            # As above, bump the register version and remember the result SSA
-            # value.
-            version = self.reg_version[reg] + 1
             op.results[0].name_hint = f"q{reg}_{version}"
             self.reg_version[reg] = version
             self.reg_ssa[reg] = op.results[0]
+            self.reg_owner[reg] = val
             info.version = version
+            info.reg = reg
 
         else:
             raise NotImplementedError
@@ -345,7 +360,7 @@ class QuantumTranslator:
 
         # ``remaining`` tracks how many uses of each SSA value remain while we
         # traverse the block.  Start with the global use counts.
-        remaining = {val: len(val.uses) for val in self.use_count}
+        self.remaining = {val: len(val.uses) for val in self.use_count}
 
         # Translate each operation in order.
         for op in block.ops:
@@ -357,6 +372,7 @@ class QuantumTranslator:
                 init_op.results[0].name_hint = f"q{reg}_0"
                 self.val_info[op.results[0]] = ValueInfo(reg, 0, ("const", op.value.value.data))
                 self.reg_ssa[reg] = init_op.results[0]
+                self.reg_owner[reg] = op.results[0]
 
             elif isinstance(op, (AddiOp, SubiOp, MuliOp, DivSIOp)):
                 # Binary arithmetic operation with two SSA operands.
@@ -364,10 +380,10 @@ class QuantumTranslator:
 
                 # Compute remaining use counts for operands after this
                 # operation executes.
-                left_count = remaining[lhs] - 1
-                right_count = remaining[rhs] - 1
-                remaining[lhs] -= 1
-                remaining[rhs] -= 1
+                left_count = self.remaining[lhs] - 1
+                right_count = self.remaining[rhs] - 1
+                self.remaining[lhs] -= 1
+                self.remaining[rhs] -= 1
 
                 # Materialize the current values of the operands.
                 q_lhs = self.emit_value(lhs)
@@ -407,13 +423,14 @@ class QuantumTranslator:
                 new_op.results[0].name_hint = f"q{reg}_{version}"
                 self.reg_version[reg] = version
                 self.reg_ssa[reg] = new_op.results[0]
+                self.reg_owner[reg] = op.results[0]
                 self.val_info[op.results[0]] = ValueInfo(reg, version, ("binary", (opcode, lhs, rhs, target)))
 
             elif op.name in ("iarith.addi_imm", "iarith.subi_imm", "iarith.muli_imm", "iarith.divsi_imm"):
                 # Binary operation where one operand is an immediate integer.
                 (lhs,) = op.operands
                 imm = int(op.imm.value.data)
-                remaining[lhs] -= 1
+                self.remaining[lhs] -= 1
                 q_lhs = self.emit_value(lhs)
                 opcode = {
                     "iarith.addi_imm": "add",
@@ -428,6 +445,7 @@ class QuantumTranslator:
                 new_op.results[0].name_hint = f"q{reg}_{version}"
                 self.reg_version[reg] = version
                 self.reg_ssa[reg] = new_op.results[0]
+                self.reg_owner[reg] = op.results[0]
                 self.val_info[op.results[0]] = ValueInfo(reg, version, ("binaryimm", (opcode, lhs, imm)))
 
             elif isinstance(op, ReturnOp):
