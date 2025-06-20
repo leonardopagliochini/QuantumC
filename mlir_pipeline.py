@@ -1,5 +1,6 @@
 import json
 import sys
+import abc
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Union
 
@@ -236,8 +237,7 @@ from xdsl.dialects.arith import IntegerOverflowAttr
 # Match signless integer-like types
 signlessIntegerLike = AnyOf([IntegerType, IndexType])
 
-@irdl_op_definition
-class SignlessIntegerBinaryOpWithImmediate(IRDLOperation):
+class SignlessIntegerBinaryOpWithImmediate(IRDLOperation, abc.ABC):
     """
     Base class for binary integer ops where the right operand is an immediate literal.
     """
@@ -251,6 +251,9 @@ class SignlessIntegerBinaryOpWithImmediate(IRDLOperation):
     imm = prop_def(IntegerAttr)
 
     traits = traits_def(Pure())
+
+    # Format similar to standard xdsl binary operations with immediates
+    assembly_format = "$lhs `,` $imm attr-dict `:` type($lhs)"
 
     def __init__(
         self,
@@ -293,8 +296,7 @@ class SignlessIntegerBinaryOpWithImmediate(IRDLOperation):
         return False  # Override if your op has an identity element
     
 
-@irdl_op_definition
-class SignlessIntegerBinaryOpWithImmediateAndOverflow(SignlessIntegerBinaryOpWithImmediate):
+class SignlessIntegerBinaryOpWithImmediateAndOverflow(SignlessIntegerBinaryOpWithImmediate, abc.ABC):
     """
     Base class for immediate-operand integer binary ops that support overflow flags.
     """
@@ -305,6 +307,10 @@ class SignlessIntegerBinaryOpWithImmediateAndOverflow(SignlessIntegerBinaryOpWit
         IntegerOverflowAttr,
         default_value=IntegerOverflowAttr("none"),
         prop_name="overflowFlags",
+    )
+
+    assembly_format = (
+        "$lhs `,` $imm (`overflow` `` $overflowFlags^)? attr-dict `:` type($lhs)"
     )
 
 
