@@ -102,12 +102,19 @@ class QuantumTranslator:
             value = expr[1]
             reg = info.reg
             version = self.reg_version[reg] + 1
+            # Allocate a fresh quantum register instead of reusing the old one.
+            # Re-initializing an existing register would be irreversible.
+            reg = self.allocate_reg()
             op = QuantumInitOp(value)
             self.current_block.add_op(op)
             op.results[0].name_hint = f"q{reg}_{version}"
             self.reg_version[reg] = version
+            op.results[0].name_hint = f"q{reg}_0"
+            self.reg_version[reg] = 0
             self.reg_ssa[reg] = op.results[0]
             info.version = version
+            info.reg = reg
+            info.version = 0
         elif expr[0] == "binary":
             opcode, lhs, rhs, target = expr[1]
             q_lhs = self.emit_value(lhs)
