@@ -192,20 +192,37 @@ class QuantumMLIRGenerator:
                 visit(stmt.value)
         return counts
 
-    def expr_cost(self, expr: Expression | None) -> int:
+    def expr_cost(
+        self, expr: Expression | None, visited: Optional[set[str]] | None = None
+    ) -> int:
+        """Estimate the cost to compute an expression.
+
+        A simple recursive heuristic is used. To avoid infinite recursion on
+        self-referential assignments (e.g. ``x = x + 1``) we keep track of the
+        variables that have already been visited while computing the cost.
+        """
+
+        if visited is None:
+            visited = set()
+
         if expr is None:
             return 0
         if isinstance(expr, IntegerLiteral):
             return 1
         if isinstance(expr, DeclRef):
-            return self.expr_cost(self.expr_table.get(expr.name))
+            if expr.name in visited:
+                return 0
+            visited.add(expr.name)
+            cost = self.expr_cost(self.expr_table.get(expr.name), visited)
+            visited.remove(expr.name)
+            return cost
         if isinstance(expr, BinaryOperator):
-            return 1 + self.expr_cost(expr.lhs) + self.expr_cost(expr.rhs)
+            return 1 + self.expr_cost(expr.lhs, visited) + self.expr_cost(expr.rhs, visited)
         if isinstance(expr, BinaryOperatorWithImmediate):
             if isinstance(expr.lhs, IntegerLiteral):
-                return 1 + self.expr_cost(expr.rhs)
+                return 1 + self.expr_cost(expr.rhs, visited)
             else:
-                return 1 + self.expr_cost(expr.lhs)
+                return 1 + self.expr_cost(expr.lhs, visited)
         return 0
 
     # ------------------------------------------------------------------
@@ -215,12 +232,12 @@ class QuantumMLIRGenerator:
             raise ValueError(f"Variable '{name}' used before initialization")
         was = self.in_recompute
         self.in_recompute = True
-        val = self._process_expression(expr)
+        val = self._process_expression(expr, name)
         self.in_recompute = was
         self.symbol_table[name] = val.value
         return val
 
-    def _process_expression(self, expr: Expression) -> ValueInfo:
+    def _process_expression(self, expr: Expression, target_var: Optional[str] = None) -> ValueInfo:
         if isinstance(expr, IntegerLiteral):
             op = QInitOp(expr.value, i32)
             self.block.add_op(op)
@@ -235,8 +252,8 @@ class QuantumMLIRGenerator:
             return ValueInfo(val, expr.name)
 
         if isinstance(expr, BinaryOperator):
-            lhs = self._process_expression(expr.lhs)
-            rhs = self._process_expression(expr.rhs)
+            lhs = self._process_expression(expr.lhs, target_var)
+            rhs = self._process_expression(expr.rhs, target_var)
 
             lhs_use = self.use_counts.get(lhs.var, 0) if lhs.var else 0
             rhs_use = self.use_counts.get(rhs.var, 0) if rhs.var else 0
@@ -272,7 +289,7 @@ class QuantumMLIRGenerator:
             self.block.add_op(op)
             result = ValueInfo(op.results[0])
 
-            if chosen.var and not self.in_recompute:
+            if chosen.var and not self.in_recompute and chosen.var != target_var:
                 if self.use_counts.get(chosen.var, 0) > 0:
                     self.symbol_table[chosen.var] = None
                     self.recompute_variable(chosen.var)
@@ -283,10 +300,10 @@ class QuantumMLIRGenerator:
         if isinstance(expr, BinaryOperatorWithImmediate):
             if isinstance(expr.lhs, IntegerLiteral):
                 imm = expr.lhs.value
-                lhs = self._process_expression(expr.rhs)
+                lhs = self._process_expression(expr.rhs, target_var)
             else:
                 imm = expr.rhs.value
-                lhs = self._process_expression(expr.lhs)
+                lhs = self._process_expression(expr.lhs, target_var)
 
             op_cls = {
                 '+': QAddiOp,
@@ -301,7 +318,7 @@ class QuantumMLIRGenerator:
             self.block.add_op(op)
             result = ValueInfo(op.results[0])
 
-            if lhs.var and not self.in_recompute:
+            if lhs.var and not self.in_recompute and lhs.var != target_var:
                 if self.use_counts.get(lhs.var, 0) > 0:
                     self.symbol_table[lhs.var] = None
                     self.recompute_variable(lhs.var)
@@ -311,8 +328,11 @@ class QuantumMLIRGenerator:
 
         raise TypeError(f"Unsupported expression type {type(expr)}")
 
-    def process_expression(self, expr: Expression) -> ValueInfo:
-        return self._process_expression(expr)
+    def process_expression(
+        self, expr: Expression, target_var: Optional[str] = None
+    ) -> ValueInfo:
+        """Process an expression, optionally knowing the variable being defined."""
+        return self._process_expression(expr, target_var)
 
     # ------------------------------------------------------------------
     def generate_function(self, func: FunctionDecl) -> FuncOp:
@@ -325,13 +345,13 @@ class QuantumMLIRGenerator:
             if isinstance(stmt, VarDecl):
                 self.expr_table[stmt.name] = stmt.init
                 if stmt.init:
-                    val = self.process_expression(stmt.init)
+                    val = self.process_expression(stmt.init, stmt.name)
                     self.symbol_table[stmt.name] = val.value
                 else:
                     self.symbol_table[stmt.name] = None
             elif isinstance(stmt, AssignStmt):
                 self.expr_table[stmt.name] = stmt.value
-                val = self.process_expression(stmt.value)
+                val = self.process_expression(stmt.value, stmt.name)
                 self.symbol_table[stmt.name] = val.value
             elif isinstance(stmt, ReturnStmt):
                 if stmt.value:
