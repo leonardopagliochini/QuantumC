@@ -9,5 +9,5 @@ int main() {
     g = g + f / a - 4;
     int h = g * 5;
     h = h / 2;
-    return 0;
+    return h;
 }

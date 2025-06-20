@@ -5,5 +5,5 @@ int main() {
     int z = x + y - 3;
     z = z + 3;
     int w = (z * 2) - 5;
-    return 0;
+    return w;
 }

@@ -7,5 +7,5 @@ int main() {
     w = w - 3;
     int v = w + 7;
     v = v * 2;
-    return 0;
+    return v;
 }

@@ -7,5 +7,5 @@ int main() {
     e = e - 2;
     int f = e * 3;
     f = f + 4;
-    return 0;
+    return f;
 }

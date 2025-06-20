@@ -4,3 +4,5 @@ output
 pizzocch*
 old*
 qvenv
+mlir_out
+json_out

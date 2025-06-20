@@ -6,5 +6,5 @@ int main() {
     f = f + 10;
     int g = f - 5;
     g = g * 2;
-    return 0;
+    return g;
 }

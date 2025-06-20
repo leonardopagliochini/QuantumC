@@ -10,5 +10,5 @@ int main() {
     g = g - 2;
     int h = g * 4;
     h = h + 8;
-    return 0;
+    return h;
 }

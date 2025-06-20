@@ -19,6 +19,6 @@ int main() {
     int qst = 7 - f;
 
 
-    return 0;
+    return qst;
 }
 

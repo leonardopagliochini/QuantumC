@@ -11,5 +11,5 @@ int main() {
     k = k - 8;
     int m = k + 12;
     m = m * 2;
-    return 0;
+    return m;
 }

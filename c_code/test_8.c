@@ -9,5 +9,5 @@ int main() {
     s = s + 9;
     int t = s - 4;
     t = t * 3;
-    return 0;
+    return t;
 }
