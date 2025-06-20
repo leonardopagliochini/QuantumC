@@ -22,7 +22,7 @@ from xdsl.irdl import (
 from xdsl.traits import Pure
 from xdsl.printer import Printer
 
-from mlir_pipeline import (
+from c_ast import (
     TranslationUnit,
     FunctionDecl,
     VarDecl,
