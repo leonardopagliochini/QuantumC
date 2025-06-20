@@ -1,3 +1,5 @@
+"""Translate standard arithmetic MLIR operations to a quantum dialect."""
+
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, Tuple, Any
@@ -20,6 +22,8 @@ from quantum_dialect import (
 
 @dataclass
 class ValueInfo:
+    """Metadata about how a value is produced and stored."""
+
     reg: int
     version: int
     expr: Any
@@ -28,6 +32,7 @@ class QuantumTranslator:
     """Translate standard MLIR to quantum-friendly dialect."""
 
     def __init__(self, module: ModuleOp):
+        """Create a translator for the given ``module``."""
         self.module = module
         self.q_module: ModuleOp | None = None
         self.next_reg = 0
@@ -39,6 +44,7 @@ class QuantumTranslator:
 
     # ------------------------------------------------------------------
     def translate(self) -> ModuleOp:
+        """Translate the entire module to the quantum dialect."""
         self.compute_use_counts()
         self.q_module = ModuleOp([])
         for func in self.module.ops:
@@ -48,6 +54,7 @@ class QuantumTranslator:
 
     # ------------------------------------------------------------------
     def compute_use_counts(self):
+        """Populate ``self.use_count`` with the number of uses for each value."""
         for func in self.module.ops:
             block = func.body.blocks[0]
             for op in block.ops:
@@ -56,6 +63,7 @@ class QuantumTranslator:
 
     # ------------------------------------------------------------------
     def compute_cost(self, val: SSAValue) -> int:
+        """Recursively estimate the cost of recomputing ``val``."""
         if val in self.cost_cache:
             return self.cost_cache[val]
         op = val.owner
@@ -77,10 +85,12 @@ class QuantumTranslator:
 
     # ------------------------------------------------------------------
     def remaining_uses(self, val: SSAValue) -> int:
+        """Return how many times ``val`` is still used."""
         return self.use_count.get(val, 0)
 
     # ------------------------------------------------------------------
     def allocate_reg(self) -> int:
+        """Allocate a new quantum register identifier."""
         r = self.next_reg
         self.next_reg += 1
         self.reg_version[r] = 0
@@ -88,6 +98,7 @@ class QuantumTranslator:
 
     # ------------------------------------------------------------------
     def emit_value(self, val: SSAValue) -> SSAValue:
+        """Ensure ``val`` is materialized and return its SSA value."""
         info = self.val_info[val]
         reg = info.reg
         if self.reg_version[reg] != info.version:
@@ -96,6 +107,7 @@ class QuantumTranslator:
 
     # ------------------------------------------------------------------
     def recompute(self, val: SSAValue):
+        """Recompute ``val`` based on the expression stored in ``val_info``."""
         info = self.val_info[val]
         expr = info.expr
         if expr[0] == "const":
@@ -150,6 +162,7 @@ class QuantumTranslator:
 
     # ------------------------------------------------------------------
     def create_binary_op(self, opcode: str, lhs: SSAValue, rhs: SSAValue) -> Operation:
+        """Emit a binary quantum op for ``opcode``."""
         if opcode == "add":
             return QAddiOp(lhs, rhs)
         if opcode == "sub":
@@ -161,6 +174,7 @@ class QuantumTranslator:
         raise NotImplementedError(opcode)
 
     def create_binary_imm_op(self, opcode: str, lhs: SSAValue, imm: int) -> Operation:
+        """Emit an immediate binary op for ``opcode``."""
         if opcode == "add":
             return QAddiImmOp(lhs, imm)
         if opcode == "sub":
@@ -173,6 +187,7 @@ class QuantumTranslator:
 
     # ------------------------------------------------------------------
     def translate_func(self, func: FuncOp) -> FuncOp:
+        """Translate a single function to the quantum dialect."""
         block = func.body.blocks[0]
         self.current_block = Block()
         self.cost_cache.clear()

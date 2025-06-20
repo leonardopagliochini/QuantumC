@@ -1,7 +1,10 @@
+"""Generate Clang JSON AST files from C sources."""
+
 import os
 import subprocess
 
-def astJsonGen(input_dir="c_code"):
+def astJsonGen(input_dir: str = "c_code") -> None:
+    """Generate JSON ASTs for all ``.c`` files in ``input_dir``."""
     # Save the current working directory (location of the script)
     current_dir = os.getcwd()
 

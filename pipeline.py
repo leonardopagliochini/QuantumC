@@ -2,6 +2,8 @@
 # QuantumIR Pipeline Driver
 # =============================================================================
 
+"""Command-line interface driving the MLIR and quantum translation pipeline."""
+
 from __future__ import annotations
 import json
 import os
@@ -19,6 +21,7 @@ class QuantumIR:
     """High-level pipeline orchestrating JSON -> MLIR generation."""
 
     def __init__(self, json_path: str = "json_out/try.json", output_dir: str = "output"):
+        """Initialize paths and load the input JSON."""
         self.json_path = json_path
         self.output_dir = output_dir
         self.root: TranslationUnit | None = None
