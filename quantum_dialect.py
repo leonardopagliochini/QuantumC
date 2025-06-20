@@ -11,6 +11,8 @@ import abc
 from typing import ClassVar
 from xdsl.ir import SSAValue, Attribute
 from xdsl.dialects.builtin import IntegerAttr, IntegerType, IndexType, AnyOf, i32
+from xdsl.parser import Parser
+from xdsl.printer import Printer
 from xdsl.irdl import (
     irdl_op_definition,
     IRDLOperation,
@@ -102,7 +104,8 @@ class QuantumBinaryImmBase(IRDLOperation, abc.ABC):
     # Immediate operand stored as a property rather than an SSA value.
     imm = prop_def(IntegerAttr)
     traits = traits_def(Pure())
-    assembly_format = "$lhs `,` $imm attr-dict `:` type($result)"
+    # Custom print/parse so the immediate value is printed without its type.
+    assembly_format = None
 
     def __init__(self, lhs: SSAValue, imm: int | IntegerAttr, result_type: Attribute | None = None):
         """Create a binary operation with an immediate operand."""
@@ -112,6 +115,25 @@ class QuantumBinaryImmBase(IRDLOperation, abc.ABC):
         if result_type is None:
             result_type = lhs.type
         super().__init__(operands=[lhs], result_types=[result_type], properties={"imm": imm})
+
+    @classmethod
+    def parse(cls, parser: Parser):
+        lhs = parser.parse_unresolved_operand()
+        parser.parse_punctuation(",")
+        imm_val = parser.parse_integer()
+        parser.parse_optional_attr_dict()
+        parser.parse_punctuation(":")
+        ty = parser.parse_type()
+        (lhs,) = parser.resolve_operands([lhs], [ty], parser.pos)
+        return cls(lhs, int(imm_val), ty)
+
+    def print(self, printer: Printer) -> None:
+        printer.print(" ")
+        printer.print_operand(self.lhs)
+        printer.print(", ")
+        self.imm.print_without_type(printer)
+        printer.print(" : ")
+        printer.print_attribute(self.result.type)
 
 
 @irdl_op_definition
