@@ -11,9 +11,9 @@ from xdsl.ir import Block, Region
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.printer import Printer
 
-from .ast import TranslationUnit, parse_ast, pretty_print_translation_unit
-from .mlir_generator import MLIRGenerator
 
+from c_ast import TranslationUnit, parse_ast, pretty_print_translation_unit
+from mlir_generator import MLIRGenerator
 
 class QuantumIR:
     """High-level pipeline orchestrating JSON -> MLIR generation."""
