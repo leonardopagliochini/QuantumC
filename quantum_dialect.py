@@ -1,4 +1,10 @@
-"""Additional quantum-specific MLIR dialect operations."""
+"""Additional quantum-specific MLIR dialect operations.
+
+This module defines a minimal set of operations that operate on quantum
+registers rather than plain integers.  They closely mirror their counterparts
+in the standard arithmetic dialect so that translated code retains a familiar
+shape while being explicit about when quantum state is modified.
+"""
 
 from __future__ import annotations
 import abc
@@ -17,6 +23,7 @@ from xdsl.irdl import (
 )
 from xdsl.traits import Pure
 
+# Matcher used to ensure operands are signless integers or indices.
 signlessIntegerLike = AnyOf([IntegerType, IndexType])
 
 @irdl_op_definition
@@ -27,6 +34,7 @@ class QuantumInitOp(IRDLOperation):
 
     T: ClassVar = VarConstraint("T", signlessIntegerLike)
     result = result_def(T)
+    # Initial value of the register stored as a property.
     value = prop_def(TypedAttributeConstraint(IntegerAttr.constr(), T))
 
     traits = traits_def(Pure())
@@ -43,6 +51,7 @@ class QuantumInitOp(IRDLOperation):
 class QuantumBinaryBase(IRDLOperation, abc.ABC):
     """Common base for binary arithmetic operations."""
     T: ClassVar = VarConstraint("T", signlessIntegerLike)
+    # Both operands and the result share the same integer type ``T``.
     lhs = operand_def(T)
     rhs = operand_def(T)
     result = result_def(T)
@@ -90,12 +99,14 @@ class QuantumBinaryImmBase(IRDLOperation, abc.ABC):
     T: ClassVar = VarConstraint("T", signlessIntegerLike)
     lhs = operand_def(T)
     result = result_def(T)
+    # Immediate operand stored as a property rather than an SSA value.
     imm = prop_def(IntegerAttr)
     traits = traits_def(Pure())
     assembly_format = "$lhs `,` $imm attr-dict `:` type($result)"
 
     def __init__(self, lhs: SSAValue, imm: int | IntegerAttr, result_type: Attribute | None = None):
         """Create a binary operation with an immediate operand."""
+        # Allow passing a Python ``int`` directly for convenience.
         if isinstance(imm, int):
             imm = IntegerAttr.from_int_and_width(imm, 32)
         if result_type is None:

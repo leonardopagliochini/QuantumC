@@ -2,7 +2,13 @@
 # Custom IRDL Operations for Immediate Arithmetic
 # =============================================================================
 
-"""IRDL operation definitions for arithmetic ops with immediate values."""
+"""IRDL operation definitions for arithmetic ops with immediate values.
+
+The standard arithmetic dialect in MLIR does not provide operations that take a
+constant immediate operand.  The classes defined here implement such ops using
+the `irdl` API so that they integrate nicely with xDSL's type system and
+verification facilities.
+"""
 
 from __future__ import annotations
 import abc
@@ -28,6 +34,8 @@ from xdsl.utils.exceptions import VerifyException
 # Type Matcher Utility
 # -----------------------------------------------------------------------------
 
+# ``signlessIntegerLike`` matches either an integer or index type.  The helper
+# is reused by all operations below for operand and result typing.
 signlessIntegerLike = AnyOf([IntegerType, IndexType])
 
 
@@ -44,12 +52,14 @@ class SignlessIntegerBinaryOpWithImmediate(IRDLOperation, abc.ABC):
     lhs = operand_def(T)
     result = result_def(T)
     imm = prop_def(IntegerAttr)
-    traits = traits_def(Pure())
+    traits = traits_def(Pure())  # Operation has no side effects
 
     assembly_format = "$lhs `,` $imm attr-dict `:` type($lhs)"
 
     def __init__(self, lhs: SSAValue, imm: int | IntegerAttr, result_type: Attribute | None = None):
         """Create the operation with ``lhs`` and an immediate value."""
+        # ``imm`` can be provided as a Python int for convenience.  Convert it
+        # to an ``IntegerAttr`` using the type of ``lhs``.
         if isinstance(imm, int):
             imm = IntegerAttr(imm, lhs.type)
         if result_type is None:
@@ -58,6 +68,8 @@ class SignlessIntegerBinaryOpWithImmediate(IRDLOperation, abc.ABC):
 
     def verify_(self):
         """Check that the immediate has the same type as the operand."""
+        # ``irdl`` does not automatically verify property types, so we enforce
+        # the immediate to match the operand type here.
         if not isinstance(self.imm, IntegerAttr):
             raise VerifyException("Immediate must be an IntegerAttr")
         if self.lhs.type != self.imm.type:
@@ -66,6 +78,7 @@ class SignlessIntegerBinaryOpWithImmediate(IRDLOperation, abc.ABC):
     @staticmethod
     def py_operation(lhs: int, imm: int) -> int | None:
         """Pure Python implementation of the operation used for testing."""
+        # Derived classes override this to provide semantics.
         return None
 
     @staticmethod
@@ -84,6 +97,7 @@ class SignlessIntegerBinaryOpWithImmediateAndOverflow(SignlessIntegerBinaryOpWit
 
     name = "mydialect.binary_imm_overflow"
 
+    # Optional overflow behavior encoded as a property.
     overflow_flags = prop_def(IntegerOverflowAttr, default_value=IntegerOverflowAttr("none"), prop_name="overflowFlags")
     assembly_format = "$lhs `,` $imm (`overflow` `` $overflowFlags^)? attr-dict `:` type($lhs)"
 
@@ -100,6 +114,7 @@ class SignlessIntegerBinaryOpWithImmediateAndOverflow(SignlessIntegerBinaryOpWit
         if result_type is None:
             result_type = lhs.type
         super().__init__(lhs=lhs, imm=imm, result_type=result_type)
+        # Store the overflow behavior on the operation instance.
         self.properties["overflowFlags"] = overflow
 
 
