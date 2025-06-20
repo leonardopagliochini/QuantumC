@@ -40,10 +40,15 @@ class QuantumIR:
         output_dir:
             Directory where artifacts produced by the pipeline will be written.
         """
+        # path to json imput
         self.json_path = json_path
+        # directory where output wil NOT BE WRITTEN it's idle
         self.output_dir = output_dir
+        # root node of the parsed AST when translated in dataclasses
         self.root: TranslationUnit | None = None
+        # MLIR module for classic MLIR
         self.module: ModuleOp | None = None
+        # MLIR module for quantum MLIR
         self.quantum_module: ModuleOp | None = None
 
         if not os.path.exists(self.json_path):
