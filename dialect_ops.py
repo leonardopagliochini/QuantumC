@@ -26,6 +26,8 @@ from xdsl.irdl import (
     traits_def,
 )
 from xdsl.dialects.arith import IntegerOverflowAttr
+from xdsl.parser import Parser
+from xdsl.printer import Printer
 from xdsl.traits import Pure
 from xdsl.utils.exceptions import VerifyException
 
@@ -54,7 +56,8 @@ class SignlessIntegerBinaryOpWithImmediate(IRDLOperation, abc.ABC):
     imm = prop_def(IntegerAttr)
     traits = traits_def(Pure())  # Operation has no side effects
 
-    assembly_format = "$lhs `,` $imm attr-dict `:` type($lhs)"
+    # Custom print/parse replaces assembly format to omit the immediate type.
+    assembly_format = None
 
     def __init__(self, lhs: SSAValue, imm: int | IntegerAttr, result_type: Attribute | None = None):
         """Create the operation with ``lhs`` and an immediate value."""
@@ -74,6 +77,25 @@ class SignlessIntegerBinaryOpWithImmediate(IRDLOperation, abc.ABC):
             raise VerifyException("Immediate must be an IntegerAttr")
         if self.lhs.type != self.imm.type:
             raise VerifyException("Operand and immediate must have matching types")
+
+    @classmethod
+    def parse(cls, parser: Parser):
+        lhs = parser.parse_unresolved_operand()
+        parser.parse_punctuation(",")
+        imm_val = parser.parse_integer()
+        parser.parse_optional_attr_dict()
+        parser.parse_punctuation(":")
+        ty = parser.parse_type()
+        (lhs,) = parser.resolve_operands([lhs], [ty], parser.pos)
+        return cls(lhs, int(imm_val), ty)
+
+    def print(self, printer: Printer) -> None:
+        printer.print(" ")
+        printer.print_operand(self.lhs)
+        printer.print(", ")
+        self.imm.print_without_type(printer)
+        printer.print(" : ")
+        printer.print_attribute(self.lhs.type)
 
     @staticmethod
     def py_operation(lhs: int, imm: int) -> int | None:
@@ -99,7 +121,8 @@ class SignlessIntegerBinaryOpWithImmediateAndOverflow(SignlessIntegerBinaryOpWit
 
     # Optional overflow behavior encoded as a property.
     overflow_flags = prop_def(IntegerOverflowAttr, default_value=IntegerOverflowAttr("none"), prop_name="overflowFlags")
-    assembly_format = "$lhs `,` $imm (`overflow` `` $overflowFlags^)? attr-dict `:` type($lhs)"
+    # Custom print/parse replaces assembly format to omit the immediate type.
+    assembly_format = None
 
     def __init__(
         self,
@@ -116,6 +139,31 @@ class SignlessIntegerBinaryOpWithImmediateAndOverflow(SignlessIntegerBinaryOpWit
         super().__init__(lhs=lhs, imm=imm, result_type=result_type)
         # Store the overflow behavior on the operation instance.
         self.properties["overflowFlags"] = overflow
+
+    @classmethod
+    def parse(cls, parser: Parser):
+        lhs = parser.parse_unresolved_operand()
+        parser.parse_punctuation(",")
+        imm_val = parser.parse_integer()
+        overflow = IntegerOverflowAttr("none")
+        if parser.parse_optional_keyword("overflow") is not None:
+            overflow = IntegerOverflowAttr(IntegerOverflowAttr.parse_parameter(parser))
+        parser.parse_optional_attr_dict()
+        parser.parse_punctuation(":")
+        ty = parser.parse_type()
+        (lhs,) = parser.resolve_operands([lhs], [ty], parser.pos)
+        return cls(lhs, int(imm_val), ty, overflow)
+
+    def print(self, printer: Printer) -> None:
+        printer.print(" ")
+        printer.print_operand(self.lhs)
+        printer.print(", ")
+        self.imm.print_without_type(printer)
+        if self.overflow_flags.flags:
+            printer.print(" overflow")
+            self.overflow_flags.print_parameter(printer)
+        printer.print(" : ")
+        printer.print_attribute(self.lhs.type)
 
 
 # -----------------------------------------------------------------------------
