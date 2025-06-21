@@ -1,3 +1,5 @@
+"""Translate classical MLIR modules into the custom quantum dialect."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -34,22 +36,32 @@ class QuantumTranslator:
     """Translate standard MLIR to the custom quantum dialect."""
 
     def __init__(self, module: ModuleOp) -> None:
+        """Store the input module and initialize translation state."""
+        # MLIR module produced by ``mlir_generator``
         self.module = module
+        # Resulting module written in the quantum dialect
         self.q_module: ModuleOp | None = None
 
+        # Counter used to allocate new registers as integers
         self.next_reg = 0
+        # Map register id -> latest version used so far
         self.reg_version: Dict[int, int] = {}
 
-        # Map classical SSA values to quantum register information
+        # Map each classical SSA value to the register/value tracking info
         self.val_info: Dict[SSAValue, ValueInfo] = {}
 
-        # Remaining use count for each SSA value
+        # Remaining number of uses for each SSA value
         self.use_count: Dict[SSAValue, int] = {}
 
     # ------------------------------------------------------------------
     def translate(self) -> ModuleOp:
+        """Convert the entire module to the quantum dialect."""
+        # Compute how many times each SSA value is used.  This information
+        # guides register allocation below.
         self.compute_use_counts()
+        # Create an empty module that will hold the translated functions.
         self.q_module = ModuleOp([])
+        # Translate each function separately.
         for func in self.module.ops:
             q_func = self.translate_func(func)
             self.q_module.body.blocks[0].add_op(q_func)
@@ -57,26 +69,35 @@ class QuantumTranslator:
 
     # ------------------------------------------------------------------
     def compute_use_counts(self) -> None:
+        """Record how many uses each SSA value has in the input module."""
         for func in self.module.ops:
             block = func.body.blocks[0]
+            # Every result value can be referenced multiple times downstream.
             for op in block.ops:
                 for res in op.results:
                     self.use_count[res] = len(res.uses)
 
     # ------------------------------------------------------------------
     def allocate_reg(self) -> int:
+        """Allocate a fresh register identifier."""
         r = self.next_reg
         self.next_reg += 1
+        # Newly created register starts at version 0.
         self.reg_version[r] = 0
         return r
 
     # ------------------------------------------------------------------
     def translate_func(self, func: FuncOp) -> FuncOp:
+        """Translate a single function to the quantum dialect."""
+        # Retrieve the function body to examine its operations.
         block = func.body.blocks[0]
+        # New block that will contain the converted operations.
         self.current_block = Block()
 
+        # Track remaining uses so we know when a register can be overwritten.
         remaining = dict(self.use_count)
 
+        # Iterate over operations in the original block in order.
         for op in block.ops:
             if isinstance(op, ConstantOp):
                 reg = self.allocate_reg()
@@ -175,6 +196,7 @@ class QuantumTranslator:
 
     # ------------------------------------------------------------------
     def create_binary_op(self, opcode: str, lhs: SSAValue, rhs: SSAValue, reg: int, version: int) -> Operation:
+        """Helper building the correct binary quantum op."""
         if opcode == "add":
             return QAddiOp(lhs, rhs, str(reg), version)
         if opcode == "sub":
@@ -186,6 +208,7 @@ class QuantumTranslator:
         raise NotImplementedError(opcode)
 
     def create_binary_imm_op(self, opcode: str, lhs: SSAValue, imm: int, reg: int, version: int) -> Operation:
+        """Helper for binary operations with a constant immediate operand."""
         if opcode == "add":
             return QAddiImmOp(lhs, imm, str(reg), version)
         if opcode == "sub":
