@@ -29,6 +29,7 @@ from c_ast import (
     FunctionDecl,
 )
 from dialect_ops import AddiImmOp, SubiImmOp, MuliImmOp, DivSImmOp
+from c_ast import pretty_print_expression
 
 
 # -----------------------------------------------------------------------------
@@ -72,6 +73,7 @@ class MLIRGenerator:
         if isinstance(expr, IntegerLiteral):
             # Lower integer constants to ``arith.constant`` operations.
             op = ConstantOp.from_int_and_width(expr.value, 32)
+            op.attributes["c_comment"] = str(expr.value)
             self.current_block.add_op(op)
             return op.results[0]
 
@@ -97,6 +99,7 @@ class MLIRGenerator:
             if op_cls is None:
                 raise ValueError(f"Unsupported binary operator: {expr.opcode}")
             op = op_cls(lhs_val, rhs_val)
+            op.attributes["c_comment"] = pretty_print_expression(expr)
             self.current_block.add_op(op)
             return op.results[0]
 
@@ -128,12 +131,14 @@ class MLIRGenerator:
             # is the left operand.
             if imm_on_left and expr.opcode in {'-', '/'}:
                 const_op = ConstantOp.from_int_and_width(imm_val, 32)
+                const_op.attributes["c_comment"] = str(imm_val)
                 self.current_block.add_op(const_op)
                 std_cls = {"-": SubiOp, "/": DivSIOp}[expr.opcode]
                 op = std_cls(const_op.results[0], other_val)
             else:
                 op = op_cls(other_val, imm_val)
 
+            op.attributes["c_comment"] = pretty_print_expression(expr)
             self.current_block.add_op(op)
             return op.results[0]
 
@@ -163,20 +168,32 @@ class MLIRGenerator:
                 # Variable declaration, possibly with initializer.
                 if stmt.init:
                     op = self.process_expression(stmt.init)
+                    if op.owner is not None:
+                        op.owner.attributes["c_comment"] = (
+                            f"{stmt.name} = {pretty_print_expression(stmt.init)}"
+                        )
                     self.symbol_table[stmt.name] = op
                 else:
                     self.symbol_table[stmt.name] = None
             elif isinstance(stmt, AssignStmt):
                 # Assignment updates the variable's SSA value.
                 value_op = self.process_expression(stmt.value)
+                if value_op.owner is not None:
+                    value_op.owner.attributes["c_comment"] = (
+                        f"{stmt.name} = {pretty_print_expression(stmt.value)}"
+                    )
                 self.symbol_table[stmt.name] = value_op
             elif isinstance(stmt, ReturnStmt):
                 # Return statements translate to a ``func.return`` op.
                 if stmt.value:
                     result_op = self.process_expression(stmt.value)
                     ret = ReturnOp(result_op)
+                    ret.attributes["c_comment"] = (
+                        f"return {pretty_print_expression(stmt.value)}"
+                    )
                 else:
                     ret = ReturnOp([])
+                    ret.attributes["c_comment"] = "return"
                 self.current_block.add_op(ret)
 
         func_type = ([i32] * len(func.params), [i32])

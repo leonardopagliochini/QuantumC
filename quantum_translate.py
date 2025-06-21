@@ -105,6 +105,9 @@ class QuantumTranslator:
                 reg = self.allocate_reg()
                 path = self.path_counter[(reg, 0)]
                 q_op = QuantumInitOp(op.value.value.data, str(reg), 0, path)
+                comment = op.attributes.get("c_comment")
+                if comment is not None:
+                    q_op.attributes["c_comment"] = comment
                 self.current_block.add_op(q_op)
                 self.path_counter[(reg, 0)] = path + 1
                 self.val_info[op.results[0]] = ValueInfo(reg, 0, path, q_op.results[0])
@@ -132,6 +135,9 @@ class QuantumTranslator:
                 second = q_rhs
 
                 q_op = self.create_binary_op(opcode, first, second, target_reg, version, path)
+                comment = op.attributes.get("c_comment")
+                if comment is not None:
+                    q_op.attributes["c_comment"] = comment
                 self.current_block.add_op(q_op)
                 self.reg_version[target_reg] = version
                 self.path_counter[(target_reg, version)] = path + 1
@@ -162,6 +168,9 @@ class QuantumTranslator:
                 path = self.path_counter.get((target_reg, version), 0)
 
                 q_op = self.create_binary_imm_op(opcode, q_lhs, imm, target_reg, version, path)
+                comment = op.attributes.get("c_comment")
+                if comment is not None:
+                    q_op.attributes["c_comment"] = comment
                 self.current_block.add_op(q_op)
                 self.reg_version[target_reg] = version
                 self.path_counter[(target_reg, version)] = path + 1
@@ -173,6 +182,9 @@ class QuantumTranslator:
                     ret = ReturnOp(info.qvalue)
                 else:
                     ret = ReturnOp([])
+                comment = op.attributes.get("c_comment")
+                if comment is not None:
+                    ret.attributes["c_comment"] = comment
                 self.current_block.add_op(ret)
 
             else:

@@ -41,6 +41,16 @@ class QuantumPrinter(Printer):
             self.print_string(_annotate_value(res))
         self.print_string(" = ")
 
+    # ------------------------------------------------------------------
+    def print_op(self, op: Operation) -> None:  # type: ignore[override]
+        """Print an operation followed by an optional comment."""
+        comment = op.attributes.pop("c_comment", None)
+        super().print_op(op)
+        if comment is not None:
+            self.print_string(f"  // {comment}")
+        if comment is not None:
+            op.attributes["c_comment"] = comment
+
 class QuantumIR:
     """High-level pipeline orchestrating JSON -> MLIR generation.
 
