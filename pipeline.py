@@ -260,10 +260,15 @@ class QuantumIR:
         """Display a dataframe of register usage across timesteps."""
         if self.paths_df is None:
             raise RuntimeError("Must call run_enforce_write_in_place first")
-        with pd.option_context("display.max_columns", None, "display.width", None):
-            print("=== Register Paths DataFrame ===")
-            print(self.paths_df.fillna(""))
-            print("=" * 35)
+        if len(self.paths_df.columns) > 10:
+            path = os.path.join(self.output_dir, "register_paths_df.csv")
+            self.paths_df.to_csv(path, index=False)
+            print(f"Register paths DataFrame saved to {path}")
+        else:
+            with pd.option_context("display.max_columns", None, "display.width", None):
+                print("=== Register Paths DataFrame ===")
+                print(self.paths_df.fillna(""))
+                print("=" * 35)
 
     # ------------------------------------------------------------------
     def build_ssa_dag(self) -> None:
@@ -290,10 +295,15 @@ class QuantumIR:
         """Display the register table after constraint enforcement."""
         if self.compliant_df is None:
             raise RuntimeError("Must call run_enforce_quantum_constraints first")
-        with pd.option_context("display.max_columns", None, "display.width", None):
-            print("=== Quantum-Compliant DataFrame ===")
-            print(self.compliant_df.fillna(""))
-            print("=" * 35)
+        if len(self.compliant_df.columns) > 10:
+            path = os.path.join(self.output_dir, "compliant_paths_df.csv")
+            self.compliant_df.to_csv(path, index=False)
+            print(f"Quantum-compliant DataFrame saved to {path}")
+        else:
+            with pd.option_context("display.max_columns", None, "display.width", None):
+                print("=== Quantum-Compliant DataFrame ===")
+                print(self.compliant_df.fillna(""))
+                print("=" * 35)
 
 
 if __name__ == "__main__":
