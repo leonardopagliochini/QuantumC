@@ -67,10 +67,10 @@ def build_paths_dataframe(module: ModuleOp) -> pd.DataFrame:
 
     for step, op in enumerate(ops):
         out = value_names.get(op.results[0]) if op.results else ""
-        expr = ""
+        mlir_expr = ""
 
         if isinstance(op, QuantumInitOp):
-            expr = f"{out} = {int(op.value.value.data)}"
+            mlir_expr = f"{out} = {int(op.value.value.data)}"
         elif type(op) in _OP_SYMBOL:
             sym = _OP_SYMBOL[type(op)]
             lhs = value_names.get(op.operands[0], "")
@@ -78,21 +78,23 @@ def build_paths_dataframe(module: ModuleOp) -> pd.DataFrame:
                 rhs = str(int(op.imm.value.data))
             else:
                 rhs = value_names.get(op.operands[1], "")
-            expr = f"{out} = {lhs} {sym} {rhs}"
+            mlir_expr = f"{out} = {lhs} {sym} {rhs}"
 
-        # Record the expression in the new 'operation' column
-        if expr:
-            df.loc[step, "operation"] = expr
+        comment = op.attributes.get("c_comment")
+        op_expr = comment if comment is not None else mlir_expr
+
+        if op_expr:
+            df.loc[step, "operation"] = op_expr
 
         rid_attr = op.properties.get("reg_id")
         rpath_attr = op.properties.get("reg_path")
-        if rid_attr is None or rpath_attr is None or not expr:
+        if rid_attr is None or rpath_attr is None or not mlir_expr:
             continue
 
         rid = int(rid_attr.data)
         path = int(rpath_attr.value.data)
         col = f"r{rid}_p{path}"
 
-        df.loc[step, col] = expr
+        df.loc[step, col] = mlir_expr
 
     return df
