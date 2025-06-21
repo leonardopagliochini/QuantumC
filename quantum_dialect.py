@@ -24,7 +24,9 @@ from xdsl.irdl import (
     traits_def,
 )
 from xdsl.ir import Operation
-from xdsl.traits import Trait
+from dataclasses import dataclass
+from xdsl.traits import OpTrait
+from xdsl.utils.exceptions import VerifyException
 from xdsl.dialects.builtin import StringAttr
 
 
@@ -38,15 +40,25 @@ from xdsl.dialects.builtin import StringAttr
 # CUSTOM TRAITS
 ################
 
-class WriteInPlace(Trait):
-    """Trait to enforce that result rewrites the first operand (in-place update)."""
-    def verify(self, op: Operation):
-        if op.operands[0] is not op.results[0]:
-            raise Exception("Operation must write in-place: result must alias lhs.")
-        lhs_reg = op.operands[0].owner.properties.get("reg_id")
-        result_reg = op.properties.get("reg_id")
-        if lhs_reg != result_reg:
-            raise Exception(f"reg_id mismatch: lhs={lhs_reg}, result={result_reg}")
+@dataclass(frozen=True)
+class WriteInPlace(OpTrait):
+    """Trait enforcing that an operation overwrites its first operand."""
+
+    def verify(self, op: Operation) -> None:
+        if not op.operands or len(op.results) != 1:
+            raise VerifyException(
+                "WriteInPlace operations must have at least one operand and exactly one result"
+            )
+        lhs_owner = op.operands[0].owner
+        lhs_reg = None
+        if isinstance(lhs_owner, Operation):
+            lhs_reg = lhs_owner.properties.get("reg_id")
+
+        op_reg = op.properties.get("reg_id")
+        if lhs_reg is not None and op_reg is not None and lhs_reg != op_reg:
+            raise VerifyException(
+                f"reg_id mismatch: lhs={lhs_reg}, op={op_reg}"
+            )
 
 
 
