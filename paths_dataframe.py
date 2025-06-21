@@ -1,4 +1,5 @@
 """Utilities for building a DataFrame visualizing register paths."""
+
 from __future__ import annotations
 
 from typing import Dict, Set
@@ -47,7 +48,13 @@ def build_paths_dataframe(module: ModuleOp) -> pd.DataFrame:
         path = int(rpath_attr.value.data)
         reg_paths.setdefault(rid, set()).add(path)
 
-    columns = [f"r{rid}_p{path}" for rid in sorted(reg_paths) for path in sorted(reg_paths[rid])]
+    columns = [
+        f"r{rid}_p{path}"
+        for rid in sorted(reg_paths)
+        for path in sorted(reg_paths[rid])
+    ]
+    # Extra column describing the operation performed at each timestep.
+    columns.append("operation")
     df = pd.DataFrame("", index=range(len(ops)), columns=columns)
 
     # Map SSAValue -> name like "%0", "%1", ...
@@ -59,16 +66,9 @@ def build_paths_dataframe(module: ModuleOp) -> pd.DataFrame:
             counter += 1
 
     for step, op in enumerate(ops):
-        rid_attr = op.properties.get("reg_id")
-        rpath_attr = op.properties.get("reg_path")
-        if rid_attr is None or rpath_attr is None:
-            continue
-        rid = int(rid_attr.data)
-        path = int(rpath_attr.value.data)
-        col = f"r{rid}_p{path}"
-
         out = value_names.get(op.results[0]) if op.results else ""
         expr = ""
+
         if isinstance(op, QuantumInitOp):
             expr = f"{out} = {int(op.value.value.data)}"
         elif type(op) in _OP_SYMBOL:
@@ -79,8 +79,19 @@ def build_paths_dataframe(module: ModuleOp) -> pd.DataFrame:
             else:
                 rhs = value_names.get(op.operands[1], "")
             expr = f"{out} = {lhs} {sym} {rhs}"
-        else:
+
+        # Record the expression in the new 'operation' column
+        if expr:
+            df.loc[step, "operation"] = expr
+
+        rid_attr = op.properties.get("reg_id")
+        rpath_attr = op.properties.get("reg_path")
+        if rid_attr is None or rpath_attr is None or not expr:
             continue
+
+        rid = int(rid_attr.data)
+        path = int(rpath_attr.value.data)
+        col = f"r{rid}_p{path}"
 
         df.loc[step, col] = expr
 
