@@ -46,6 +46,7 @@ class WriteInPlace(OpTrait):
     """Trait enforcing that an operation overwrites its first operand."""
 
     def verify(self, op: Operation) -> None:
+        """Ensure the annotated operation obeys the in-place semantics."""
         if not op.operands or len(op.results) != 1:
             raise VerifyException(
                 "WriteInPlace operations must have at least one operand and exactly one result"
@@ -215,6 +216,7 @@ class QuantumBinaryImmBase(IRDLOperation, abc.ABC):
 
     @classmethod
     def parse(cls, parser: Parser):
+        """Parse the custom assembly form with reg_id and reg_version."""
         lhs = parser.parse_unresolved_operand()
         parser.parse_punctuation(",")
         imm_val = parser.parse_integer()

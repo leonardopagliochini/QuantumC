@@ -38,6 +38,11 @@ The compilation process performed by `pipeline.py` consists of four stages:
 
 Running the pipeline will therefore produce two MLIR modules: the direct lowering from C and the equivalent program expressed with quantum operations.
 
+The translator assigns a numeric register identifier to each integer variable and
+tracks a version number every time a register is overwritten.  The classical and
+quantum versions are compared in ``test_mlir_equivalence.py`` using the xDSL
+interpreter to ensure they compute the same result.
+
 ## Project Structure
 
 ```
@@ -49,9 +54,23 @@ Running the pipeline will therefore produce two MLIR modules: the direct lowerin
 ├── quantum_dialect.py     – MLIR dialect for quantum operations
 ├── quantum_translate.py   – translate classical MLIR to the quantum dialect
 ├── pipeline.py            – command line driver combining all phases
-├── run_all_pipeline.py    – helper to process all JSON files at once
+├── mlir_pipeline.py       – compatibility layer re-exporting the main classes
+├── test_mlir_equivalence.py – lightweight regression test
 └── docs/                  – additional documentation
 ```
 
 Each module exposes small classes and functions with comprehensive docstrings so the internals can be inspected using standard Python tools.
+
+### File Descriptions
+
+* **astJsonGen.py** – Uses Clang to dump the AST of each C example.
+* **generate_ast.py** – Wrapper around ``astJsonGen.py`` populating ``json_out``.
+* **c_ast.py** – Dataclass definitions representing the C AST.
+* **mlir_generator.py** – Lowers the dataclasses to classic MLIR.
+* **dialect_ops.py** – Immediate arithmetic operations used during lowering.
+* **quantum_dialect.py** – Defines the custom quantum operations and properties.
+* **quantum_translate.py** – Rewrites standard MLIR into the quantum dialect.
+* **pipeline.py** – Command line driver running the whole compilation pipeline.
+* **mlir_pipeline.py** – Compatibility layer re-exporting frequently used names.
+* **test_mlir_equivalence.py** – Regression test comparing classical and quantum outputs.
 
