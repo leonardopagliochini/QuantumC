@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Set
 
 import networkx as nx
 from xdsl.ir import Operation, Block, Region
@@ -145,6 +145,64 @@ def _compute_next_overwrite(ops: List[Operation]) -> Dict[Tuple[int, int], int]:
     return next_ow
 
 
+def _compute_last_use(ops: List[Operation]) -> Dict[Tuple[int, int], int]:
+    """Return the last timestep each register version is referenced."""
+    last_use: Dict[Tuple[int, int], int] = {}
+    for idx, op in enumerate(ops):
+        for operand in op.operands:
+            owner = operand.owner
+            if owner is None:
+                continue
+            rid = _get_attr_int(owner, "reg_id")
+            ver = _get_attr_int(owner, "reg_version")
+            if rid is None or ver is None:
+                continue
+            last_use[(rid, ver)] = idx
+    # Treat return operands as used after the last op
+    last_idx = len(ops)
+    for op in ops:
+        if isinstance(op, ReturnOp):
+            for operand in op.operands:
+                owner = operand.owner
+                if owner is None:
+                    continue
+                rid = _get_attr_int(owner, "reg_id")
+                ver = _get_attr_int(owner, "reg_version")
+                if rid is None or ver is None:
+                    continue
+                last_use[(rid, ver)] = max(last_use.get((rid, ver), -1), last_idx)
+    return last_use
+
+
+def compute_available_values(module: ModuleOp) -> List[Set[Tuple[int, int]]]:
+    """Return which register versions are live after each step."""
+    func = next(iter(module.ops))
+    ops = list(func.body.blocks[0].ops)
+    next_overwrite = _compute_next_overwrite(ops)
+    last_use = _compute_last_use(ops)
+
+    available: Set[Tuple[int, int]] = set()
+    timeline: List[Set[Tuple[int, int]]] = []
+    for idx, op in enumerate(ops):
+        # Drop expired values
+        to_drop = [key for key in available if idx >= next_overwrite.get(key, int(1e9)) or idx > last_use.get(key, idx)]
+        for key in to_drop:
+            available.discard(key)
+
+        timeline.append(set(available))
+
+        rid = _get_attr_int(op, "reg_id")
+        ver = _get_attr_int(op, "reg_version")
+        if rid is None or ver is None:
+            continue
+        if last_use.get((rid, ver), -1) > idx:
+            available = {k for k in available if k[0] != rid}
+            available.add((rid, ver))
+
+    timeline.append(set(available))
+    return timeline
+
+
 def _create_like(
     op: Operation, operands: List[Operation | None], new_rid: int | None = None
 ) -> Operation:
@@ -178,6 +236,7 @@ def enforce_constraints(module: ModuleOp) -> ModuleOp:
     orig_ops = list(func.body.blocks[0].ops)
 
     next_overwrite = _compute_next_overwrite(orig_ops)
+    last_use = _compute_last_use(orig_ops)
     existing_ids = [i for i in (_get_attr_int(op, "reg_id") for op in orig_ops) if i is not None]
     next_reg = max(existing_ids, default=-1) + 1
 
@@ -189,17 +248,32 @@ def enforce_constraints(module: ModuleOp) -> ModuleOp:
 
     new_block = Block()
     new_ops_map: Dict[Operation, Operation] = {}
+    available_ops: Dict[Tuple[int, int], Operation] = {}
 
-    def clone_rec(op: Operation) -> Operation:
-        operands = [clone_rec(o.owner) for o in op.operands]
+    def clone_rec(op: Operation, idx: int) -> Operation:
+        if op in new_ops_map:
+            return new_ops_map[op]
         rid = _get_attr_int(op, "reg_id")
         ver = _get_attr_int(op, "reg_version")
+        key = (rid, ver)
+        if key in available_ops:
+            return available_ops[key]
+
+        operands = [clone_rec(o.owner, idx) for o in op.operands]
         new_rid = alloc_reg() if rid is not None else None
         new_op = _create_like(op, operands, new_rid)
         new_block.add_op(new_op)
+        new_ops_map[op] = new_op
+        if rid is not None and ver is not None and last_use.get(key, -1) > idx:
+            available_ops[key] = new_op
         return new_op
 
     for idx, op in enumerate(orig_ops):
+        # Expire values that are overwritten or no longer needed
+        for key in list(available_ops.keys()):
+            if idx >= next_overwrite.get(key, int(1e9)) or idx > last_use.get(key, idx):
+                del available_ops[key]
+
         operands: List[Operation] = []
         orig_inputs = [o.owner for o in op.operands]
         for inp in orig_inputs:
@@ -207,8 +281,14 @@ def enforce_constraints(module: ModuleOp) -> ModuleOp:
                 continue
             rid = _get_attr_int(inp, "reg_id")
             ver = _get_attr_int(inp, "reg_version")
-            if rid is not None and ver is not None and idx >= next_overwrite.get((rid, ver), int(1e9)):
-                operands.append(clone_rec(inp))
+            key = (rid, ver)
+            if rid is not None and ver is not None:
+                if key in available_ops:
+                    operands.append(available_ops[key])
+                elif idx >= next_overwrite.get(key, int(1e9)):
+                    operands.append(clone_rec(inp, idx))
+                else:
+                    operands.append(new_ops_map[inp])
             else:
                 operands.append(new_ops_map[inp])
 
@@ -220,12 +300,20 @@ def enforce_constraints(module: ModuleOp) -> ModuleOp:
             v1 = _get_attr_int(orig_inputs[1], "reg_version")
             if r0 is not None and r1 is not None and v0 is not None and v1 is not None:
                 if r0 == r1 and v0 == v1:
-                    operands[1] = clone_rec(orig_inputs[1])
+                    operands[1] = clone_rec(orig_inputs[1], idx)
 
         rid = _get_attr_int(op, "reg_id")
+        ver = _get_attr_int(op, "reg_version")
+        key = (rid, ver)
         new_op = _create_like(op, operands, rid)
         new_block.add_op(new_op)
         new_ops_map[op] = new_op
+        if rid is not None and ver is not None and last_use.get(key, -1) > idx:
+            # remove previous version of the same register
+            for old in list(available_ops.keys()):
+                if old[0] == rid:
+                    del available_ops[old]
+            available_ops[key] = new_op
 
     new_func = FuncOp(func.sym_name.data, func.function_type, Region([new_block]))
     return ModuleOp([new_func])
