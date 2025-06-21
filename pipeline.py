@@ -261,7 +261,7 @@ class QuantumIR:
 
 if __name__ == "__main__":
     try:
-        input_json_path = sys.argv[1] if len(sys.argv) > 1 else "json_out/try.json"
+        input_json_path = sys.argv[1] if len(sys.argv) > 1 else "json_out/test_paths.json"
         pipeline = QuantumIR(json_path=input_json_path)
         print()
         pipeline.run_dataclass()
