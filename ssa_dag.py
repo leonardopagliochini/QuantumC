@@ -96,8 +96,22 @@ def visualize_dag(g: nx.DiGraph, path: str) -> None:
     pos = graphviz_layout(g, prog="dot")
     labels = nx.get_node_attributes(g, "label")
     plt.figure(figsize=(12, 6))
-    nx.draw(g, pos, with_labels=True, labels=labels, node_size=1500,
-            node_color="lightblue", arrowsize=20, font_size=8)
+    nx.draw_networkx_nodes(g, pos, node_size=1500, node_color="lightblue")
+    nx.draw_networkx_edges(
+        g,
+        pos,
+        arrows=True,
+        arrowsize=20,
+        arrowstyle="->",
+        connectionstyle="arc3,rad=0.1",
+    )
+    nx.draw_networkx_labels(
+        g,
+        pos,
+        labels=labels,
+        font_size=8,
+        bbox=dict(facecolor="white", edgecolor="none", pad=0.3),
+    )
     plt.tight_layout()
     plt.savefig(path)
     plt.close()
