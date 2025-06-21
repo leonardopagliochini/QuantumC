@@ -22,6 +22,7 @@ from xdsl.irdl import (
     result_def,
     prop_def,
     traits_def,
+    ParsePropInAttrDict,
 )
 from xdsl.ir import Operation
 from dataclasses import dataclass
@@ -85,6 +86,7 @@ class QuantumInitOp(IRDLOperation):
     value = prop_def(TypedAttributeConstraint(IntegerAttr.constr(), T))
     reg_id = prop_def(StringAttr)  # <-- Register id
 
+    irdl_options = [ParsePropInAttrDict()]
     assembly_format = "attr-dict $value"
 
     def __init__(self, value: int | IntegerAttr, reg_id: str, result_type: Attribute = i32):
@@ -108,6 +110,7 @@ class QuantumBinaryBase(IRDLOperation, abc.ABC):
     result = result_def(T)
     reg_id = prop_def(StringAttr)  # <-- register id
 
+    irdl_options = [ParsePropInAttrDict()]
     traits = traits_def(WriteInPlace())
 
     assembly_format = "$lhs `,` $rhs attr-dict `:` type($result)"
@@ -162,6 +165,7 @@ class QuantumBinaryImmBase(IRDLOperation, abc.ABC):
     imm = prop_def(IntegerAttr)
     reg_id = prop_def(StringAttr)  # <-- NEW
 
+    irdl_options = [ParsePropInAttrDict()]
     traits = traits_def(WriteInPlace())
     assembly_format = None
 
@@ -185,11 +189,19 @@ class QuantumBinaryImmBase(IRDLOperation, abc.ABC):
         lhs = parser.parse_unresolved_operand()
         parser.parse_punctuation(",")
         imm_val = parser.parse_integer()
-        parser.parse_optional_attr_dict()
+        attrs = parser.parse_optional_attr_dict()
         parser.parse_punctuation(":")
         ty = parser.parse_type()
         (lhs,) = parser.resolve_operands([lhs], [ty], parser.pos)
-        return cls(lhs, int(imm_val), ty)
+
+        reg_id_attr = None
+        if attrs is not None:
+            reg_id_attr = attrs.get("reg_id")
+
+        if not isinstance(reg_id_attr, StringAttr):
+            parser.raise_error("expected 'reg_id' attribute", parser.pos)
+
+        return cls(lhs, int(imm_val), reg_id_attr.data, ty)
 
     def print(self, printer: Printer) -> None:
         printer.print(" ")

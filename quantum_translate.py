@@ -161,35 +161,29 @@ class QuantumTranslator:
     def create_binary_op(self, opcode: str, lhs: SSAValue, rhs: SSAValue, reg: int) -> Operation:
         """Emit a binary quantum op for ``opcode``."""
         
-        # properties to pass to operations, only reg for now
-        props = {"reg_id": reg}
-
         # Map the textual opcode to the corresponding quantum operation class.
         if opcode == "add":
-            return QAddiOp(lhs, rhs, properties=props)  
+            return QAddiOp(lhs, rhs, reg)
         if opcode == "sub":
-            return QSubiOp(lhs, rhs, properties=props)  
+            return QSubiOp(lhs, rhs, reg)
         if opcode == "mul":
-            return QMuliOp(lhs, rhs, properties=props)  
+            return QMuliOp(lhs, rhs, reg)
         if opcode == "div":
-            return QDivSOp(lhs, rhs, properties=props) 
+            return QDivSOp(lhs, rhs, reg)
         raise NotImplementedError(opcode)
 
     def create_binary_imm_op(self, opcode: str, lhs: SSAValue, imm: int, reg: int) -> Operation:
         """Emit an immediate binary op for ``opcode``."""
 
-        # properties to pass to operations, only reg for now
-        props = {"reg_id": reg}  # add
-
         # Similar to ``create_binary_op`` but one operand is a Python integer.
         if opcode == "add":
-            return QAddiImmOp(lhs, imm, properties=props)  # add
+            return QAddiImmOp(lhs, imm, reg)
         if opcode == "sub":
-            return QSubiImmOp(lhs, imm, properties=props)  # add
+            return QSubiImmOp(lhs, imm, reg)
         if opcode == "mul":
-            return QMuliImmOp(lhs, imm, properties=props)  # add
+            return QMuliImmOp(lhs, imm, reg)
         if opcode == "div":
-            return QDivSImmOp(lhs, imm, properties=props)  # add
+            return QDivSImmOp(lhs, imm, reg)
         raise NotImplementedError(opcode)
 
     # ------------------------------------------------------------------
@@ -241,20 +235,15 @@ class QuantumTranslator:
                 target = lhs
                 first, second = q_lhs, q_rhs
 
-                # Emit the quantum binary operation and update bookkeeping for
-                # the overwritten target register.
-                new_op = self.create_binary_op(opcode, first, second)
-                self.current_block.add_op(new_op)
-
-                # Retrieve the register associated with the overwritten operand.
+                # Determine which register will be overwritten and pass it to
+                # the quantum operation constructor.
                 reg = self.val_info[target].reg
+                new_op = self.create_binary_op(opcode, first, second, reg)
+                self.current_block.add_op(new_op)
 
                 # Increment the version for this register and name the result.
                 version = self.reg_version[reg] + 1
                 new_op.results[0].name_hint = f"q{reg}_{version}"
-
-                # assing register as a property to the result
-                new_op.results[0].properties["reg_id"] = reg
 
                 # Update bookkeeping for register version and SSA mapping.
                 self.reg_version[reg] = version
@@ -279,18 +268,16 @@ class QuantumTranslator:
                     "iarith.divsi_imm": "div",
                 }[op.name]
 
-                # Emit the quantum immediate operation using lhs and imm.
-                new_op = self.create_binary_imm_op(opcode, q_lhs, imm)
+                # Retrieve the destination register and emit the quantum
+                # immediate operation using lhs and imm.
+                reg = self.val_info[lhs].reg
+                new_op = self.create_binary_imm_op(opcode, q_lhs, imm, reg)
                 self.current_block.add_op(new_op)
 
                 # Retrieve and increment the register version for lhs.
-                reg = self.val_info[lhs].reg
                 version = self.reg_version[reg] + 1
                 new_op.results[0].name_hint = f"q{reg}_{version}"
                 
-                # assing register as a property to the result
-                new_op.results[0].properties["reg_id"] = reg
-
 
                 # Update bookkeeping for SSA and reg_id mapping.
                 self.reg_version[reg] = version
