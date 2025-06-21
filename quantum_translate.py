@@ -1,24 +1,15 @@
-"""Translate standard arithmetic MLIR operations to a quantum dialect.
-
-This module provides ``QuantumTranslator`` which walks over a module
-containing standard arithmetic operations and produces an equivalent
-module using the custom quantum dialect defined in ``quantum_dialect``.
-The translation keeps track of quantum registers, recreating values
-when necessary and attempting to reuse registers when possible.
-"""
+"""Translate standard arithmetic MLIR to a custom quantum dialect."""
 
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import Dict, Tuple, Any
 
-# xdsl imports used to manipulate MLIR operations and types
+from dataclasses import dataclass
+from typing import Dict, Any
+
 from xdsl.dialects.builtin import ModuleOp, i32
 from xdsl.dialects.func import FuncOp, ReturnOp
 from xdsl.dialects.arith import ConstantOp, AddiOp, SubiOp, MuliOp, DivSIOp
 from xdsl.ir import Block, Region, SSAValue, Operation
 
-# Quantum dialect operations that mirror the arithmetic ops but operate on
-# quantum registers instead of plain integers.
 from quantum_dialect import (
     QuantumInitOp,
     QAddiOp,
@@ -31,199 +22,204 @@ from quantum_dialect import (
     QDivSImmOp,
 )
 
+
 @dataclass
 class ValueInfo:
-    """Metadata about how a value is produced and stored.
-
-    ``reg``
-        Identifier of the quantum register holding the value.
-
-    ``version``
-        Version number indicating which value is currently stored in the
-        register.  Whenever the register contents change the version is
-        incremented so we know if a cached value is stale.
-
-    ``expr``
-        A description of how to recompute the value if the register gets
-        overwritten.  The translator stores a tuple describing the original
-        operation that produced the value so it can be regenerated on demand.
-    """
+    """Information tracking where a value is stored and how to recompute it."""
 
     reg: int
     version: int
     expr: Any
 
+
 class QuantumTranslator:
-    """Translate standard MLIR to quantum-friendly dialect."""
+    """Convert standard MLIR into the quantum dialect."""
 
-    def __init__(self, module: ModuleOp):
-        """Create a translator for the given ``module``.
-
-        Parameters
-        ----------
-        module:
-            The input ``ModuleOp`` containing arithmetic operations that will
-            be converted to the quantum dialect.
-        """
-
-        # The original module that will be walked and rewritten.
+    def __init__(self, module: ModuleOp) -> None:
         self.module = module
-
-        # Placeholder for the translated module once ``translate`` is called.
         self.q_module: ModuleOp | None = None
 
-        # ``next_reg`` stores the number of the next free quantum register.
-        # Registers are identified by an integer and are allocated sequentially.
+        # Next free register identifier.
         self.next_reg = 0
 
-        # Mapping from SSA values in the original module to ``ValueInfo``
-        # records.  These records describe which register currently contains the
-        # value and how it can be recomputed if needed.
+        # Map from SSA values to the register/version storing them.
         self.val_info: Dict[SSAValue, ValueInfo] = {}
-
-        # Track, for each register, which version of the value it currently
-        # holds.  This allows the translator to detect when a cached value has
-        # been overwritten and needs recomputation.
         self.reg_version: Dict[int, int] = {}
-
-        # Map each register identifier to the most recent SSA value representing
-        # its contents in the quantum module being built.
         self.reg_ssa: Dict[int, SSAValue] = {}
 
-        # Number of remaining uses for every SSA value in the original module.
+        # Use count for each SSA value in the original program.
         self.use_count: Dict[SSAValue, int] = {}
 
-        # Cache used by ``compute_cost`` to memoize recomputation costs.
+        # Cost cache used when deciding whether to recompute values.
         self.cost_cache: Dict[SSAValue, int] = {}
 
     # ------------------------------------------------------------------
     def translate(self) -> ModuleOp:
-        """Translate the entire module to the quantum dialect."""
+        """Translate ``self.module`` to the quantum dialect."""
 
-        # First compute how many times each SSA value is used.  This information
-        # is needed later when deciding whether we can overwrite a register or
-        # if we must keep its original value alive.
         self.compute_use_counts()
-
-        # Create a new, empty module that will hold the translated functions.
         self.q_module = ModuleOp([])
-
-        # Translate each function one by one and append the resulting quantum
-        # function to the new module.
         for func in self.module.ops:
             q_func = self.translate_func(func)
             self.q_module.body.blocks[0].add_op(q_func)
-
-        # The new module is now populated with quantum dialect operations.
         return self.q_module
 
     # ------------------------------------------------------------------
-    def compute_use_counts(self):
-        """Populate ``self.use_count`` with the number of uses for each value."""
-        # Walk through all operations in every function and count how many times
-        # each SSA value result is referenced.  The result is stored in the
-        # ``use_count`` dictionary.
+    def compute_use_counts(self) -> None:
         for func in self.module.ops:
             block = func.body.blocks[0]
             for op in block.ops:
                 for res in op.results:
                     self.use_count[res] = len(res.uses)
 
+    # ------------------------------------------------------------------
+    def compute_cost(self, val: SSAValue) -> int:
+        if val in self.cost_cache:
+            return self.cost_cache[val]
+
+        op = val.owner
+        if isinstance(op, ConstantOp):
+            cost = 1
+        elif isinstance(op, (AddiOp, SubiOp, MuliOp, DivSIOp)):
+            cost = 1 + self.compute_cost(op.operands[0]) + self.compute_cost(op.operands[1])
+        elif op.name in (
+            "iarith.addi_imm",
+            "iarith.subi_imm",
+            "iarith.muli_imm",
+            "iarith.divsi_imm",
+        ):
+            cost = 1 + self.compute_cost(op.operands[0])
+        else:
+            cost = 1
+
+        self.cost_cache[val] = cost
+        return cost
 
     # ------------------------------------------------------------------
     def allocate_reg(self) -> int:
-        """Allocate a new quantum register identifier."""
-
-        # Registers are numbered sequentially. ``next_reg`` always points to the
-        # first unused identifier.
         r = self.next_reg
         self.next_reg += 1
-
-        # Start the version counter for the new register at zero.
         self.reg_version[r] = 0
         return r
 
     # ------------------------------------------------------------------
     def emit_value(self, val: SSAValue) -> SSAValue:
-        """Ensure ``val`` is materialized and return its SSA value."""
-
-        # ``val_info`` tells us which register currently stores ``val`` and
-        # which version of the value should be present there.
         info = self.val_info[val]
         reg = info.reg
 
-        # Return the SSA value associated with the current contents of the
-        # register.
+        if self.reg_version[reg] != info.version:
+            self.recompute(val)
+            reg = info.reg
+
         return self.reg_ssa[reg]
 
+    # ------------------------------------------------------------------
+    def recompute(self, val: SSAValue) -> None:
+        info = self.val_info[val]
+        expr = info.expr
+
+        if expr[0] == "const":
+            value = expr[1]
+            reg = self.allocate_reg()
+            op = QuantumInitOp(value, str(reg))
+            self.current_block.add_op(op)
+            version = 0
+            op.results[0].name_hint = f"q{reg}_{version}"
+            self.reg_version[reg] = version
+            self.reg_ssa[reg] = op.results[0]
+            info.reg = reg
+            info.version = version
+
+        elif expr[0] == "binary":
+            opcode, lhs, rhs, target = expr[1]
+            q_lhs = self.emit_value(lhs)
+            q_rhs = self.emit_value(rhs)
+
+            if target is rhs:
+                first, second = q_rhs, q_lhs
+                reg = self.val_info[rhs].reg
+            else:
+                first, second = q_lhs, q_rhs
+                reg = self.val_info[lhs].reg
+
+            op = self.create_binary_op(opcode, first, second, reg)
+            self.current_block.add_op(op)
+            version = self.reg_version[reg] + 1
+            op.results[0].name_hint = f"q{reg}_{version}"
+            self.reg_version[reg] = version
+            self.reg_ssa[reg] = op.results[0]
+            info.version = version
+
+        elif expr[0] == "binaryimm":
+            opcode, lhs, imm = expr[1]
+            q_lhs = self.emit_value(lhs)
+            reg = self.val_info[lhs].reg
+            op = self.create_binary_imm_op(opcode, q_lhs, imm, reg)
+            self.current_block.add_op(op)
+            version = self.reg_version[reg] + 1
+            op.results[0].name_hint = f"q{reg}_{version}"
+            self.reg_version[reg] = version
+            self.reg_ssa[reg] = op.results[0]
+            info.version = version
+
+        else:
+            raise NotImplementedError
 
     # ------------------------------------------------------------------
     def create_binary_op(self, opcode: str, lhs: SSAValue, rhs: SSAValue, reg: int) -> Operation:
-        """Emit a binary quantum op for ``opcode``."""
-        
-        # Map the textual opcode to the corresponding quantum operation class.
         if opcode == "add":
-            return QAddiOp(lhs, rhs, reg)
+            return QAddiOp(lhs, rhs, str(reg))
         if opcode == "sub":
-            return QSubiOp(lhs, rhs, reg)
+            return QSubiOp(lhs, rhs, str(reg))
         if opcode == "mul":
-            return QMuliOp(lhs, rhs, reg)
+            return QMuliOp(lhs, rhs, str(reg))
         if opcode == "div":
-            return QDivSOp(lhs, rhs, reg)
+            return QDivSOp(lhs, rhs, str(reg))
         raise NotImplementedError(opcode)
 
     def create_binary_imm_op(self, opcode: str, lhs: SSAValue, imm: int, reg: int) -> Operation:
-        """Emit an immediate binary op for ``opcode``."""
-
-        # Similar to ``create_binary_op`` but one operand is a Python integer.
         if opcode == "add":
-            return QAddiImmOp(lhs, imm, reg)
+            return QAddiImmOp(lhs, imm, str(reg))
         if opcode == "sub":
-            return QSubiImmOp(lhs, imm, reg)
+            return QSubiImmOp(lhs, imm, str(reg))
         if opcode == "mul":
-            return QMuliImmOp(lhs, imm, reg)
+            return QMuliImmOp(lhs, imm, str(reg))
         if opcode == "div":
-            return QDivSImmOp(lhs, imm, reg)
+            return QDivSImmOp(lhs, imm, str(reg))
         raise NotImplementedError(opcode)
 
     # ------------------------------------------------------------------
     def translate_func(self, func: FuncOp) -> FuncOp:
-        """Translate a single function to the quantum dialect."""
-
-        # We only handle single-block functions. ``block`` is the list of
-        # arithmetic operations that will be translated.
         block = func.body.blocks[0]
-
-        # ``current_block`` accumulates the newly created quantum operations.
         self.current_block = Block()
-
-        # Clear the cost cache since costs depend on the current function only.
         self.cost_cache.clear()
 
-        # Translate each operation in order.
+        for op in block.ops:
+            for res in op.results:
+                self.compute_cost(res)
+
+        remaining = {val: len(val.uses) for val in self.use_count}
+
         for op in block.ops:
             if isinstance(op, ConstantOp):
-                # Constants simply allocate a new register and initialize it.
                 reg = self.allocate_reg()
-                init_op = QuantumInitOp(op.value.value.data, reg)
+                init_op = QuantumInitOp(op.value.value.data, str(reg))
                 self.current_block.add_op(init_op)
-
-                # Use naming convention for register versioning.
                 init_op.results[0].name_hint = f"q{reg}_0"
-
-                # Track result metadata for register management.
                 self.val_info[op.results[0]] = ValueInfo(reg, 0, ("const", op.value.value.data))
                 self.reg_ssa[reg] = init_op.results[0]
 
             elif isinstance(op, (AddiOp, SubiOp, MuliOp, DivSIOp)):
-                # Binary arithmetic operation with two SSA operands.
                 lhs, rhs = op.operands
 
-                # Materialize the current values of the operands.
+                left_count = remaining[lhs] - 1
+                right_count = remaining[rhs] - 1
+                remaining[lhs] -= 1
+                remaining[rhs] -= 1
+
                 q_lhs = self.emit_value(lhs)
                 q_rhs = self.emit_value(rhs)
 
-                # Determine the opcode string for convenience.
                 opcode = {
                     AddiOp: "add",
                     SubiOp: "sub",
@@ -231,62 +227,55 @@ class QuantumTranslator:
                     DivSIOp: "div",
                 }[type(op)]
 
-                # For quantum ops we always overwrite the lhs register.
-                target = lhs
-                first, second = q_lhs, q_rhs
+                comm = opcode in ("add", "mul")
+                if comm:
+                    if left_count > 0 and right_count == 0:
+                        first, second, target = q_rhs, q_lhs, rhs
+                    elif right_count > 0 and left_count == 0:
+                        first, second, target = q_lhs, q_rhs, lhs
+                    else:
+                        if self.compute_cost(lhs) <= self.compute_cost(rhs):
+                            first, second, target = q_lhs, q_rhs, lhs
+                        else:
+                            first, second, target = q_rhs, q_lhs, rhs
+                else:
+                    first, second, target = q_lhs, q_rhs, lhs
 
-                # Determine which register will be overwritten and pass it to
-                # the quantum operation constructor.
                 reg = self.val_info[target].reg
                 new_op = self.create_binary_op(opcode, first, second, reg)
                 self.current_block.add_op(new_op)
-
-                # Increment the version for this register and name the result.
                 version = self.reg_version[reg] + 1
                 new_op.results[0].name_hint = f"q{reg}_{version}"
-
-                # Update bookkeeping for register version and SSA mapping.
                 self.reg_version[reg] = version
                 self.reg_ssa[reg] = new_op.results[0]
                 self.val_info[op.results[0]] = ValueInfo(reg, version, ("binary", (opcode, lhs, rhs, target)))
 
-            elif op.name in ("iarith.addi_imm", "iarith.subi_imm", "iarith.muli_imm", "iarith.divsi_imm"):
-                # Binary operation where one operand is an immediate integer.
+            elif op.name in (
+                "iarith.addi_imm",
+                "iarith.subi_imm",
+                "iarith.muli_imm",
+                "iarith.divsi_imm",
+            ):
                 (lhs,) = op.operands
-
-                # Parse the immediate value from the operation.
                 imm = int(op.imm.value.data)
-
-                # Materialize the SSA operand value.
+                remaining[lhs] -= 1
                 q_lhs = self.emit_value(lhs)
-
-                # Select the opcode for the quantum dialect equivalent.
                 opcode = {
                     "iarith.addi_imm": "add",
                     "iarith.subi_imm": "sub",
                     "iarith.muli_imm": "mul",
                     "iarith.divsi_imm": "div",
                 }[op.name]
-
-                # Retrieve the destination register and emit the quantum
-                # immediate operation using lhs and imm.
                 reg = self.val_info[lhs].reg
                 new_op = self.create_binary_imm_op(opcode, q_lhs, imm, reg)
                 self.current_block.add_op(new_op)
-
-                # Retrieve and increment the register version for lhs.
                 version = self.reg_version[reg] + 1
                 new_op.results[0].name_hint = f"q{reg}_{version}"
-                
-
-                # Update bookkeeping for SSA and reg_id mapping.
                 self.reg_version[reg] = version
                 self.reg_ssa[reg] = new_op.results[0]
                 self.val_info[op.results[0]] = ValueInfo(reg, version, ("binaryimm", (opcode, lhs, imm)))
 
             elif isinstance(op, ReturnOp):
-                # Return statements are forwarded directly after materializing
-                # the returned value.
                 if op.operands:
                     q_val = self.emit_value(op.operands[0])
                     ret = ReturnOp(q_val)
@@ -295,10 +284,8 @@ class QuantumTranslator:
                 self.current_block.add_op(ret)
 
             else:
-                # Any other operation is currently unsupported.
                 raise NotImplementedError(f"Unsupported op {op.name}")
 
-        # Construct the function with the same signature as the original but
-        # containing the newly built block of quantum operations.
         func_type = ([i32] * len(func.function_type.inputs.data), [i32])
         return FuncOp(func.sym_name.data, func_type, Region([self.current_block]))
+
