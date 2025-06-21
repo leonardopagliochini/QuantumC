@@ -17,7 +17,7 @@ Both scripts rely on the helper modules described below.
    ```bash
    source qvenv/bin/activate
    ```
-2. Generate ASTs for all test C programs:
+2. Generate ASTs for all test C programs, always do this before running pipeline:
    ```bash
    python generate_ast.py
    ```

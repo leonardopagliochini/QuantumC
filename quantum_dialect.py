@@ -23,7 +23,10 @@ from xdsl.irdl import (
     prop_def,
     traits_def,
 )
-from xdsl.traits import Pure
+
+# TRAITS COULD BE INTRESTING TO BE EXPLORED MORE OR CUSTOMIZED for quantum operations
+# purity makes no sense for quantum register because of: writing in place of the resul on one of the operands, no-cloning theorem
+# from xdsl.traits import Pure
 
 # Matcher used to ensure operands are signless integers or indices.
 signlessIntegerLike = AnyOf([IntegerType, IndexType])
@@ -39,7 +42,8 @@ class QuantumInitOp(IRDLOperation):
     # Initial value of the register stored as a property.
     value = prop_def(TypedAttributeConstraint(IntegerAttr.constr(), T))
 
-    traits = traits_def(Pure())
+    # purity makes no sense in quantum operations
+    # traits = traits_def(Pure())
 
     assembly_format = "attr-dict $value"
 
@@ -57,7 +61,10 @@ class QuantumBinaryBase(IRDLOperation, abc.ABC):
     lhs = operand_def(T)
     rhs = operand_def(T)
     result = result_def(T)
-    traits = traits_def(Pure())
+
+    # purity makes no sense in quantum operations
+    # traits = traits_def(Pure())
+    
     assembly_format = "$lhs `,` $rhs attr-dict `:` type($result)"
 
     def __init__(self, lhs: SSAValue, rhs: SSAValue, result_type: Attribute | None = None):
@@ -103,7 +110,11 @@ class QuantumBinaryImmBase(IRDLOperation, abc.ABC):
     result = result_def(T)
     # Immediate operand stored as a property rather than an SSA value.
     imm = prop_def(IntegerAttr)
-    traits = traits_def(Pure())
+
+    # purity makes no sense in quantum operations
+    # traits = traits_def(Pure())
+    
+    
     # Custom print/parse so the immediate value is printed without its type.
     assembly_format = None
 
