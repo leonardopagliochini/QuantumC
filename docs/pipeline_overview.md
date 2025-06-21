@@ -7,5 +7,6 @@ The project translates small C programs to a quantum-inspired MLIR dialect in se
 3. **Classical MLIR Generation** – `QuantumIR.run_generate_ir` uses `MLIRGenerator` to lower the dataclasses to standard MLIR.
 4. **Write-in-Place Enforcement** – `QuantumIR.run_enforce_write_in_place` calls `QuantumTranslator` to rewrite the MLIR using the quantum dialect while enforcing in-place updates.
 5. **Visualization** – helper methods print both the classical and write-in-place modules using a custom printer.
+6. **Path DataFrame** – `QuantumIR.visualize_paths_dataframe` displays a pandas table showing register usage over time.
 
 Each step can be invoked individually when experimenting with the compiler.

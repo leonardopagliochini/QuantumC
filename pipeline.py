@@ -18,6 +18,7 @@ import re
 from io import StringIO
 
 from xdsl.ir import Block, Region, Operation
+import pandas as pd
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.printer import Printer
 from quantum_dialect import _annotate_value
@@ -239,6 +240,52 @@ class QuantumIR:
         formatted = pretty_print_mlir_lines(buf.getvalue().splitlines())
         print(formatted)
 
+    def visualize_paths_dataframe(self) -> None:
+        """Display a dataframe of register usage across timesteps."""
+        if self.write_in_place_module is None:
+            raise RuntimeError("Must call run_enforce_write_in_place first")
+        func = next(iter(self.write_in_place_module.ops))
+        block = func.body.blocks[0]
+
+        ops = list(block.ops)
+
+        # Discover all register ids and paths present in the block.
+        reg_paths: dict[int, set[int]] = {}
+        for op in ops:
+            rid_attr = op.properties.get("reg_id")
+            rpath_attr = op.properties.get("reg_path")
+            if rid_attr is None or rpath_attr is None:
+                continue
+            rid = int(rid_attr.data)
+            path = int(rpath_attr.value.data)
+            reg_paths.setdefault(rid, set()).add(path)
+
+        columns: list[str] = []
+        for rid in sorted(reg_paths.keys()):
+            for path in sorted(reg_paths[rid]):
+                columns.append(f"r{rid}_p{path}")
+
+        df = pd.DataFrame("", index=range(len(ops)), columns=columns)
+
+        result_counter = 0
+        for step, op in enumerate(ops):
+            rid_attr = op.properties.get("reg_id")
+            rpath_attr = op.properties.get("reg_path")
+            comment = op.attributes.get("c_comment")
+            if rid_attr is not None and rpath_attr is not None:
+                rid = int(rid_attr.data)
+                path = int(rpath_attr.value.data)
+                text = f"%{result_counter}"
+                if comment is not None:
+                    text += f" // {comment}"
+                col = f"r{rid}_p{path}"
+                df.loc[step, col] = text
+            result_counter += len(op.results)
+
+        with pd.option_context("display.max_columns", None,
+                                "display.width", None):
+            print(df.fillna(""))
+
 
 if __name__ == "__main__":
     try:
@@ -252,6 +299,7 @@ if __name__ == "__main__":
         pipeline.visualize_ir()
         pipeline.run_enforce_write_in_place()
         pipeline.visualize_write_in_place_ir()
+        pipeline.visualize_paths_dataframe()
     except Exception as e:
         print("Error in the execution of the program:", e)
         raise
