@@ -2,12 +2,12 @@
 
 ## Introduction
 
-QuantumC demonstrates a tiny compilation pipeline based on [xDSL](https://github.com/xdsl-project/xdsl). The repository converts small C programs into MLIR and then rewrites that MLIR using a custom quantum dialect.  The code is intentionally compact so that each phase of the translation process can be inspected and experimented with easily.
+QuantumC demonstrates a tiny compilation pipeline based on [xDSL](https://github.com/xdsl-project/xdsl). The repository converts small C programs into MLIR and then rewrites that MLIR using a custom quantum dialect.  The last step currently produces an *intermediate* form expressed with that dialect rather than a full quantum program. The code is intentionally compact so that each phase of the translation process can be inspected and experimented with easily.
 
 The flow is divided into two main scripts:
 
 * `generate_ast.py` invokes Clang on every `.c` file under `c_code` and stores the JSON AST into `json_out`.
-* `pipeline.py <path>` loads one of those JSON files, converts it into dataclasses, lowers the dataclasses to standard MLIR, and finally translates that MLIR to the quantum dialect.
+* `pipeline.py <path>` loads one of those JSON files, converts it into dataclasses, lowers the dataclasses to standard MLIR, and finally converts that MLIR into an intermediate form using the quantum dialect.
 
 Both scripts rely on the helper modules described below.
 
@@ -25,7 +25,7 @@ Both scripts rely on the helper modules described below.
    ```bash
    python pipeline.py json_out/try.json
    ```
-   The script prints the reconstructed C source, the classical MLIR, and the quantum MLIR to the terminal.
+   The script prints the reconstructed C source, the classical MLIR, and the intermediate quantum IR to the terminal.
 
 ## Pipeline Overview
 
@@ -33,14 +33,14 @@ The compilation process performed by `pipeline.py` consists of four stages:
 
 1. **JSON Parsing** – `c_ast.parse_ast` converts the Clang generated JSON AST into a hierarchy of lightweight dataclasses such as `FunctionDecl`, `VarDecl`, and `BinaryOperator`.
 2. **MLIR Generation** – `mlir_generator.MLIRGenerator` walks those dataclasses and emits standard MLIR using the xDSL API.  Operations with constant immediates make use of custom ops defined in `dialect_ops.py`.
-3. **Quantum Translation** – `quantum_translate.QuantumTranslator` analyzes the classical MLIR and rewrites it into the quantum dialect defined in `quantum_dialect.py`.  Each integer variable becomes a quantum register.  Arithmetic operations are replaced by their quantum counterparts, allocating and reusing registers as needed.
+3. **Intermediate Translation** – `quantum_translate.QuantumTranslator` analyzes the classical MLIR and rewrites it into the quantum dialect defined in `quantum_dialect.py`.  The resulting module serves as an intermediate form between classical and quantum representations.  Each integer variable becomes a quantum register and arithmetic operations are replaced by their quantum counterparts, allocating and reusing registers as needed.
 4. **Printing** – xDSL's `Printer` utility is used to display the generated modules.
 
-Running the pipeline will therefore produce two MLIR modules: the direct lowering from C and the equivalent program expressed with quantum operations.
+Running the pipeline will therefore produce two MLIR modules: the direct lowering from C and an intermediate version expressed with quantum-style operations.
 
 The translator assigns a numeric register identifier to each integer variable and
 tracks a version number every time a register is overwritten.  The classical and
-quantum versions are compared in ``test_mlir_equivalence.py`` using the xDSL
+intermediate versions are compared in ``test_mlir_equivalence.py`` using the xDSL
 interpreter to ensure they compute the same result.
 
 ## Project Structure
@@ -72,5 +72,5 @@ Each module exposes small classes and functions with comprehensive docstrings so
 * **quantum_translate.py** – Rewrites standard MLIR into the quantum dialect.
 * **pipeline.py** – Command line driver running the whole compilation pipeline.
 * **mlir_pipeline.py** – Compatibility layer re-exporting frequently used names.
-* **test_mlir_equivalence.py** – Regression test comparing classical and quantum outputs.
+* **test_mlir_equivalence.py** – Regression test comparing classical and intermediate outputs.
 

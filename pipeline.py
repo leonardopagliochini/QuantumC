@@ -2,12 +2,13 @@
 # QuantumIR Pipeline Driver
 # =============================================================================
 
-"""Command-line interface driving the MLIR and quantum translation pipeline.
+"""Command-line interface driving the MLIR generation pipeline.
 
 The :class:`QuantumIR` class orchestrates all phases: parsing the JSON AST into
-dataclasses, lowering them to MLIR, translating that MLIR to the quantum
-dialect and finally printing the results.  This module also acts as a small
-CLI entry point that wires those pieces together when executed as a script.
+dataclasses, lowering them to MLIR, producing an intermediate representation
+between classical and quantum, and finally printing the results.  This module
+also acts as a small CLI entry point wiring those pieces together when executed
+as a script.
 """
 
 from __future__ import annotations
@@ -42,16 +43,16 @@ class QuantumIR:
         output_dir:
             Directory where artifacts produced by the pipeline will be written.
         """
-        # path to json imput
+        # Path to the input JSON file
         self.json_path = json_path
-        # directory where output wil NOT BE WRITTEN it's idle
+        # Directory where pipeline artifacts would be stored (currently unused)
         self.output_dir = output_dir
         # root node of the parsed AST when translated in dataclasses
         self.root: TranslationUnit | None = None
         # MLIR module for classic MLIR
         self.module: ModuleOp | None = None
-        # MLIR module for quantum MLIR
-        self.quantum_module: ModuleOp | None = None
+        # MLIR module for the intermediate quantum representation
+        self.intermediate_module: ModuleOp | None = None
 
         if not os.path.exists(self.json_path):
             raise FileNotFoundError(f"Input JSON file not found: {self.json_path}")
@@ -118,8 +119,8 @@ class QuantumIR:
         Printer().print_op(self.module)
         print()
 
-    def run_generate_quantum_ir(self) -> None:
-        """Translate standard MLIR to the quantum dialect.
+    def run_generate_intermediate_ir(self) -> None:
+        """Translate standard MLIR to the intermediate quantum dialect.
 
         Raises
         ------
@@ -129,17 +130,17 @@ class QuantumIR:
         if self.module is None:
             raise RuntimeError("Must call run_generate_ir first")
         
-        # Run the translator to produce quantum-specific operations.
+        # Run the translator to produce quantum-inspired operations.
         translator = QuantumTranslator(self.module)
-        self.quantum_module = translator.translate()
-        print("Quantum MLIR successfully generated.")
+        self.intermediate_module = translator.translate()
+        print("Intermediate MLIR successfully generated.")
 
-    def visualize_quantum_ir(self) -> None:
-        """Print the MLIR generated for the quantum dialect."""
-        if self.quantum_module is None:
-            raise RuntimeError("Must call run_generate_quantum_ir first")
-        # Display the module that uses the quantum dialect.
-        Printer().print_op(self.quantum_module)
+    def visualize_intermediate_ir(self) -> None:
+        """Print the intermediate MLIR bridging classical and quantum."""
+        if self.intermediate_module is None:
+            raise RuntimeError("Must call run_generate_intermediate_ir first")
+        # Display the module that uses the intermediate dialect.
+        Printer().print_op(self.intermediate_module)
         print()
 
 
@@ -153,8 +154,8 @@ if __name__ == "__main__":
         pipeline.pretty_print_source()
         pipeline.run_generate_ir()
         pipeline.visualize_ir()
-        pipeline.run_generate_quantum_ir()
-        pipeline.visualize_quantum_ir()
+        pipeline.run_generate_intermediate_ir()
+        pipeline.visualize_intermediate_ir()
     except Exception as e:
         print("Error in the execution of the program:", e)
         raise

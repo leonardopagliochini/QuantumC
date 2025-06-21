@@ -1,4 +1,4 @@
-"""Check that classical and quantum MLIR evaluate to the same result."""
+"""Check that classical and intermediate MLIR evaluate to the same result."""
 
 from __future__ import annotations
 
@@ -147,13 +147,13 @@ def compare(path: str) -> None:
     pipeline.run_dataclass()
     pipeline.run_generate_ir()
     classical = pipeline.module
-    pipeline.run_generate_quantum_ir()
-    quantum = pipeline.quantum_module
+    pipeline.run_generate_intermediate_ir()
+    intermediate = pipeline.intermediate_module
 
     classical_res = run_module(classical)
-    quantum_res = run_module(quantum)
-    print(f"{path}: classical={classical_res}, quantum={quantum_res}")
-    assert classical_res == quantum_res
+    intermediate_res = run_module(intermediate)
+    print(f"{path}: classical={classical_res}, intermediate={intermediate_res}")
+    assert classical_res == intermediate_res
 
 
 if __name__ == "__main__":
