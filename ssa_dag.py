@@ -146,10 +146,13 @@ def _compute_next_overwrite(ops: List[Operation]) -> Dict[Tuple[int, int], int]:
 
 
 def _create_like(
-    op: Operation, operands: List[Operation | None], new_rid: int | None = None
+    op: Operation,
+    operands: List[Operation | None],
+    new_rid: int | None = None,
+    new_ver: int | None = None,
 ) -> Operation:
     rid = _get_attr_int(op, "reg_id") if new_rid is None else new_rid
-    ver = _get_attr_int(op, "reg_version")
+    ver = _get_attr_int(op, "reg_version") if new_ver is None else new_ver
     comment = op.attributes.get("c_comment")
 
     if isinstance(op, QuantumInitOp):
@@ -180,22 +183,31 @@ def enforce_constraints(module: ModuleOp) -> ModuleOp:
     next_overwrite = _compute_next_overwrite(orig_ops)
     existing_ids = [i for i in (_get_attr_int(op, "reg_id") for op in orig_ops) if i is not None]
     next_reg = max(existing_ids, default=-1) + 1
+    version_counter: Dict[int, int] = {rid: 0 for rid in existing_ids}
 
     def alloc_reg() -> int:
         nonlocal next_reg
         r = next_reg
         next_reg += 1
+        version_counter[r] = 0
         return r
 
     new_block = Block()
     new_ops_map: Dict[Operation, Operation] = {}
 
-    def clone_rec(op: Operation) -> Operation:
-        operands = [clone_rec(o.owner) for o in op.operands]
+    def clone_rec(op: Operation, reg_map: Dict[int, int]) -> Operation:
+        operands = [clone_rec(o.owner, reg_map) for o in op.operands]
         rid = _get_attr_int(op, "reg_id")
-        ver = _get_attr_int(op, "reg_version")
-        new_rid = alloc_reg() if rid is not None else None
-        new_op = _create_like(op, operands, new_rid)
+        if rid is not None:
+            if rid not in reg_map:
+                reg_map[rid] = alloc_reg()
+            new_rid = reg_map[rid]
+            ver = version_counter[new_rid]
+            version_counter[new_rid] += 1
+        else:
+            new_rid = None
+            ver = None
+        new_op = _create_like(op, operands, new_rid, ver)
         new_block.add_op(new_op)
         return new_op
 
@@ -208,7 +220,7 @@ def enforce_constraints(module: ModuleOp) -> ModuleOp:
             rid = _get_attr_int(inp, "reg_id")
             ver = _get_attr_int(inp, "reg_version")
             if rid is not None and ver is not None and idx >= next_overwrite.get((rid, ver), int(1e9)):
-                operands.append(clone_rec(inp))
+                operands.append(clone_rec(inp, {}))
             else:
                 operands.append(new_ops_map[inp])
 
@@ -220,10 +232,14 @@ def enforce_constraints(module: ModuleOp) -> ModuleOp:
             v1 = _get_attr_int(orig_inputs[1], "reg_version")
             if r0 is not None and r1 is not None and v0 is not None and v1 is not None:
                 if r0 == r1 and v0 == v1:
-                    operands[1] = clone_rec(orig_inputs[1])
+                    operands[1] = clone_rec(orig_inputs[1], {})
 
         rid = _get_attr_int(op, "reg_id")
-        new_op = _create_like(op, operands, rid)
+        ver = None
+        if rid is not None:
+            ver = version_counter.get(rid, 0)
+            version_counter[rid] = ver + 1
+        new_op = _create_like(op, operands, rid, ver)
         new_block.add_op(new_op)
         new_ops_map[op] = new_op
 
