@@ -25,10 +25,11 @@ from quantum_dialect import (
 
 @dataclass
 class ValueInfo:
-    """Track the register and version representing a classical SSA value."""
+    """Track the register, version and path for a quantum SSA value."""
 
     reg: int
     version: int
+    path: int
     qvalue: SSAValue
 
 
@@ -46,6 +47,8 @@ class QuantumTranslator:
         self.next_reg = 0
         # Map register id -> latest version used so far
         self.reg_version: Dict[int, int] = {}
+        # Map (register id, version) -> next available path index
+        self.path_counter: Dict[tuple[int, int], int] = {}
 
         # Map each classical SSA value to the register/value tracking info
         self.val_info: Dict[SSAValue, ValueInfo] = {}
@@ -84,6 +87,8 @@ class QuantumTranslator:
         self.next_reg += 1
         # Newly created register starts at version 0.
         self.reg_version[r] = 0
+        # Initialize path counter for version 0
+        self.path_counter[(r, 0)] = 0
         return r
 
     # ------------------------------------------------------------------
@@ -94,21 +99,18 @@ class QuantumTranslator:
         # New block that will contain the converted operations.
         self.current_block = Block()
 
-        # Track remaining uses so we know when a register can be overwritten.
-        remaining = dict(self.use_count)
-
         # Iterate over operations in the original block in order.
         for op in block.ops:
             if isinstance(op, ConstantOp):
                 reg = self.allocate_reg()
-                q_op = QuantumInitOp(op.value.value.data, str(reg), 0)
+                path = self.path_counter[(reg, 0)]
+                q_op = QuantumInitOp(op.value.value.data, str(reg), 0, path)
                 self.current_block.add_op(q_op)
-                self.val_info[op.results[0]] = ValueInfo(reg, 0, q_op.results[0])
+                self.path_counter[(reg, 0)] = path + 1
+                self.val_info[op.results[0]] = ValueInfo(reg, 0, path, q_op.results[0])
 
             elif isinstance(op, (AddiOp, SubiOp, MuliOp, DivSIOp)):
                 lhs, rhs = op.operands
-                remaining[lhs] -= 1
-                remaining[rhs] -= 1
 
                 lhs_info = self.val_info[lhs]
                 rhs_info = self.val_info[rhs]
@@ -122,31 +124,18 @@ class QuantumTranslator:
                     DivSIOp: "div",
                 }[type(op)]
 
-                commutative = opcode in {"add", "mul"}
-                target_reg = None
+                # Always overwrite the left operand's register.
+                target_reg = lhs_info.reg
+                version = lhs_info.version + 1
+                path = self.path_counter.get((target_reg, version), 0)
                 first = q_lhs
                 second = q_rhs
 
-                if commutative:
-                    if remaining[lhs] == 0:
-                        target_reg = lhs_info.reg
-                    elif remaining[rhs] == 0:
-                        target_reg = rhs_info.reg
-                        first, second = q_rhs, q_lhs
-                else:
-                    if remaining[lhs] == 0:
-                        target_reg = lhs_info.reg
-
-                if target_reg is None:
-                    target_reg = self.allocate_reg()
-                    version = 0
-                else:
-                    version = self.reg_version[target_reg] + 1
-
-                q_op = self.create_binary_op(opcode, first, second, target_reg, version)
+                q_op = self.create_binary_op(opcode, first, second, target_reg, version, path)
                 self.current_block.add_op(q_op)
                 self.reg_version[target_reg] = version
-                self.val_info[op.results[0]] = ValueInfo(target_reg, version, q_op.results[0])
+                self.path_counter[(target_reg, version)] = path + 1
+                self.val_info[op.results[0]] = ValueInfo(target_reg, version, path, q_op.results[0])
 
             elif op.name in (
                 "iarith.addi_imm",
@@ -155,7 +144,6 @@ class QuantumTranslator:
                 "iarith.divsi_imm",
             ):
                 (lhs,) = op.operands
-                remaining[lhs] -= 1
                 imm = int(op.imm.value.data)
 
                 lhs_info = self.val_info[lhs]
@@ -168,17 +156,16 @@ class QuantumTranslator:
                     "iarith.divsi_imm": "div",
                 }[op.name]
 
-                if remaining[lhs] == 0:
-                    target_reg = lhs_info.reg
-                    version = self.reg_version[target_reg] + 1
-                else:
-                    target_reg = self.allocate_reg()
-                    version = 0
+                # Immediate form also overwrites the left operand.
+                target_reg = lhs_info.reg
+                version = lhs_info.version + 1
+                path = self.path_counter.get((target_reg, version), 0)
 
-                q_op = self.create_binary_imm_op(opcode, q_lhs, imm, target_reg, version)
+                q_op = self.create_binary_imm_op(opcode, q_lhs, imm, target_reg, version, path)
                 self.current_block.add_op(q_op)
                 self.reg_version[target_reg] = version
-                self.val_info[op.results[0]] = ValueInfo(target_reg, version, q_op.results[0])
+                self.path_counter[(target_reg, version)] = path + 1
+                self.val_info[op.results[0]] = ValueInfo(target_reg, version, path, q_op.results[0])
 
             elif isinstance(op, ReturnOp):
                 if op.operands:
@@ -195,26 +182,26 @@ class QuantumTranslator:
         return FuncOp(func.sym_name.data, func_type, Region([self.current_block]))
 
     # ------------------------------------------------------------------
-    def create_binary_op(self, opcode: str, lhs: SSAValue, rhs: SSAValue, reg: int, version: int) -> Operation:
+    def create_binary_op(self, opcode: str, lhs: SSAValue, rhs: SSAValue, reg: int, version: int, path: int) -> Operation:
         """Helper building the correct binary quantum op."""
         if opcode == "add":
-            return QAddiOp(lhs, rhs, str(reg), version)
+            return QAddiOp(lhs, rhs, str(reg), version, path)
         if opcode == "sub":
-            return QSubiOp(lhs, rhs, str(reg), version)
+            return QSubiOp(lhs, rhs, str(reg), version, path)
         if opcode == "mul":
-            return QMuliOp(lhs, rhs, str(reg), version)
+            return QMuliOp(lhs, rhs, str(reg), version, path)
         if opcode == "div":
-            return QDivSOp(lhs, rhs, str(reg), version)
+            return QDivSOp(lhs, rhs, str(reg), version, path)
         raise NotImplementedError(opcode)
 
-    def create_binary_imm_op(self, opcode: str, lhs: SSAValue, imm: int, reg: int, version: int) -> Operation:
+    def create_binary_imm_op(self, opcode: str, lhs: SSAValue, imm: int, reg: int, version: int, path: int) -> Operation:
         """Helper for binary operations with a constant immediate operand."""
         if opcode == "add":
-            return QAddiImmOp(lhs, imm, str(reg), version)
+            return QAddiImmOp(lhs, imm, str(reg), version, path)
         if opcode == "sub":
-            return QSubiImmOp(lhs, imm, str(reg), version)
+            return QSubiImmOp(lhs, imm, str(reg), version, path)
         if opcode == "mul":
-            return QMuliImmOp(lhs, imm, str(reg), version)
+            return QMuliImmOp(lhs, imm, str(reg), version, path)
         if opcode == "div":
-            return QDivSImmOp(lhs, imm, str(reg), version)
+            return QDivSImmOp(lhs, imm, str(reg), version, path)
         raise NotImplementedError(opcode)
