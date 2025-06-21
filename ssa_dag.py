@@ -106,16 +106,6 @@ def visualize_dag(g: nx.DiGraph, path: str) -> None:
 # Quantum Constraint Enforcement
 # -----------------------------------------------------------------------------
 
-def _compute_path_counters(ops: List[Operation]) -> Dict[Tuple[int, int], int]:
-    counters: Dict[Tuple[int, int], int] = {}
-    for op in ops:
-        rid = _get_attr_int(op, "reg_id")
-        ver = _get_attr_int(op, "reg_version")
-        path = _get_attr_int(op, "reg_path")
-        if rid is None or ver is None or path is None:
-            continue
-        counters[(rid, ver)] = max(counters.get((rid, ver), 0), path + 1)
-    return counters
 
 
 def _compute_next_overwrite(ops: List[Operation]) -> Dict[Tuple[int, int], int]:
@@ -135,18 +125,20 @@ def _compute_next_overwrite(ops: List[Operation]) -> Dict[Tuple[int, int], int]:
     return next_ow
 
 
-def _create_like(op: Operation, operands: List[Operation | None], path: int | None) -> Operation:
-    rid = _get_attr_int(op, "reg_id")
+def _create_like(
+    op: Operation, operands: List[Operation | None], new_rid: int | None = None
+) -> Operation:
+    rid = _get_attr_int(op, "reg_id") if new_rid is None else new_rid
     ver = _get_attr_int(op, "reg_version")
     comment = op.attributes.get("c_comment")
 
     if isinstance(op, QuantumInitOp):
-        new_op = QuantumInitOp(int(op.value.value.data), str(rid), ver, path or 0)
+        new_op = QuantumInitOp(int(op.value.value.data), str(rid), ver, 0)
     elif isinstance(op, (QAddiOp, QSubiOp, QMuliOp, QDivSOp)):
-        new_op = type(op)(operands[0].results[0], operands[1].results[0], str(rid), ver, path or 0)
+        new_op = type(op)(operands[0].results[0], operands[1].results[0], str(rid), ver, 0)
     elif isinstance(op, (QAddiImmOp, QSubiImmOp, QMuliImmOp, QDivSImmOp)):
         imm = int(op.imm.value.data)
-        new_op = type(op)(operands[0].results[0], imm, str(rid), ver, path or 0)
+        new_op = type(op)(operands[0].results[0], imm, str(rid), ver, 0)
     elif isinstance(op, ReturnOp):
         if operands:
             new_op = ReturnOp(operands[0].results[0])
@@ -165,8 +157,15 @@ def enforce_constraints(module: ModuleOp) -> ModuleOp:
     func = next(iter(module.ops))
     orig_ops = list(func.body.blocks[0].ops)
 
-    path_counters = _compute_path_counters(orig_ops)
     next_overwrite = _compute_next_overwrite(orig_ops)
+    existing_ids = [i for i in (_get_attr_int(op, "reg_id") for op in orig_ops) if i is not None]
+    next_reg = max(existing_ids, default=-1) + 1
+
+    def alloc_reg() -> int:
+        nonlocal next_reg
+        r = next_reg
+        next_reg += 1
+        return r
 
     new_block = Block()
     new_ops_map: Dict[Operation, Operation] = {}
@@ -175,11 +174,8 @@ def enforce_constraints(module: ModuleOp) -> ModuleOp:
         operands = [clone_rec(o.owner) for o in op.operands]
         rid = _get_attr_int(op, "reg_id")
         ver = _get_attr_int(op, "reg_version")
-        p = None
-        if rid is not None and ver is not None:
-            p = path_counters[(rid, ver)]
-            path_counters[(rid, ver)] = p + 1
-        new_op = _create_like(op, operands, p)
+        new_rid = alloc_reg() if rid is not None else None
+        new_op = _create_like(op, operands, new_rid)
         new_block.add_op(new_op)
         return new_op
 
@@ -206,8 +202,8 @@ def enforce_constraints(module: ModuleOp) -> ModuleOp:
                 if r0 == r1 and v0 == v1:
                     operands[1] = clone_rec(orig_inputs[1])
 
-        p = _get_attr_int(op, "reg_path")
-        new_op = _create_like(op, operands, p)
+        rid = _get_attr_int(op, "reg_id")
+        new_op = _create_like(op, operands, rid)
         new_block.add_op(new_op)
         new_ops_map[op] = new_op
 
