@@ -14,6 +14,8 @@ from __future__ import annotations
 import json
 import os
 import sys
+import re
+from io import StringIO
 
 from xdsl.ir import Block, Region, Operation
 from xdsl.dialects.builtin import ModuleOp
@@ -50,6 +52,69 @@ class QuantumPrinter(Printer):
             self.print_string(f"  // {comment}")
         if comment is not None:
             op.attributes["c_comment"] = comment
+
+
+def pretty_print_mlir_lines(lines: list[str]) -> str:
+    """Return MLIR lines with columns aligned for readability."""
+    pattern = re.compile(
+        r"^(\s*)(%\d+)(?:\s+({[^}]+}))?\s*=\s*(\S+)\s*(.*?)\s*(:(?:\s*[^/]+))?\s*(//.*)?$"
+    )
+    entries: list[tuple[str, str, str, str, str, str, str]] = []
+    flags: list[bool] = []
+    for line in lines:
+        m = pattern.match(line)
+        if m:
+            indent, ssa, attr, op, args, ty, cmt = m.groups()
+            entries.append(
+                (
+                    indent,
+                    ssa.strip(),
+                    (attr or "").strip(),
+                    op.strip(),
+                    args.strip(),
+                    (ty or "").strip(),
+                    (cmt or "").strip(),
+                )
+            )
+            flags.append(True)
+        else:
+            entries.append((line, "", "", "", "", "", ""))
+            flags.append(False)
+
+    widths = [0, 0, 0, 0, 0]
+    for entry, is_op in zip(entries, flags):
+        if not is_op:
+            continue
+        _, ssa, attr, op, args, ty, _ = entry
+        widths[0] = max(widths[0], len(ssa))
+        widths[1] = max(widths[1], len(attr))
+        widths[2] = max(widths[2], len(op))
+        widths[3] = max(widths[3], len(args))
+        widths[4] = max(widths[4], len(ty))
+
+    result_lines: list[str] = []
+    for entry, is_op in zip(entries, flags):
+        if not is_op:
+            result_lines.append(entry[0])
+            continue
+        indent, ssa, attr, op, args, ty, cmt = entry
+        formatted = (
+            indent
+            + ssa.ljust(widths[0])
+            + "  "
+            + attr.ljust(widths[1])
+            + "  =  "
+            + op.ljust(widths[2])
+            + "  "
+            + args.ljust(widths[3])
+            + "  "
+            + ty.ljust(widths[4])
+        )
+        if cmt:
+            formatted += "  " + cmt
+        result_lines.append(formatted.rstrip())
+
+    return "\n".join(result_lines)
 
 class QuantumIR:
     """High-level pipeline orchestrating JSON -> MLIR generation.
@@ -140,8 +205,10 @@ class QuantumIR:
         """
         if self.module is None:
             raise RuntimeError("Must call run_generate_ir first")
-        # Dump the module using the xDSL printer.
-        QuantumPrinter().print_op(self.module)
+        buf = StringIO()
+        QuantumPrinter(stream=buf).print_op(self.module)
+        formatted = pretty_print_mlir_lines(buf.getvalue().splitlines())
+        print(formatted)
         print()
 
     def run_enforce_write_in_place(self) -> None:
@@ -167,8 +234,10 @@ class QuantumIR:
         """Print the IR after write-in-place enforcement."""
         if self.write_in_place_module is None:
             raise RuntimeError("Must call run_enforce_write_in_place first")
-        # Display the module that uses the enforced dialect.
-        QuantumPrinter().print_op(self.write_in_place_module)
+        buf = StringIO()
+        QuantumPrinter(stream=buf).print_op(self.write_in_place_module)
+        formatted = pretty_print_mlir_lines(buf.getvalue().splitlines())
+        print(formatted)
 
 
 if __name__ == "__main__":
