@@ -23,6 +23,8 @@ from xdsl.printer import Printer
 from c_ast import TranslationUnit, parse_ast, pretty_print_translation_unit
 from mlir_generator import MLIRGenerator
 
+from quantum_translate import QuantumTranslator
+
 class QuantumIR:
     """High-level pipeline orchestrating JSON -> MLIR generation.
 
@@ -126,7 +128,7 @@ class QuantumIR:
         """
         if self.module is None:
             raise RuntimeError("Must call run_generate_ir first")
-        from quantum_translate import QuantumTranslator
+        
         # Run the translator to produce quantum-specific operations.
         translator = QuantumTranslator(self.module)
         self.quantum_module = translator.translate()
