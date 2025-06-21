@@ -28,6 +28,7 @@ from c_ast import TranslationUnit, parse_ast, pretty_print_translation_unit
 from mlir_generator import MLIRGenerator
 
 from quantum_translate import QuantumTranslator
+from paths_dataframe import build_paths_dataframe
 
 
 class QuantumPrinter(Printer):
@@ -144,6 +145,8 @@ class QuantumIR:
         self.module: ModuleOp | None = None
         # MLIR module after write-in-place enforcement
         self.write_in_place_module: ModuleOp | None = None
+        # DataFrame visualizing register paths
+        self.paths_df: pd.DataFrame | None = None
 
         if not os.path.exists(self.json_path):
             raise FileNotFoundError(f"Input JSON file not found: {self.json_path}")
@@ -229,6 +232,8 @@ class QuantumIR:
         self.write_in_place_module = translator.translate()
         # Verify that all write-in-place invariants hold.
         self.write_in_place_module.verify()
+        # Build the register usage dataframe for later inspection
+        self.paths_df = build_paths_dataframe(self.write_in_place_module)
         print("Write-in-place MLIR successfully generated.")
 
     def visualize_write_in_place_ir(self) -> None:
@@ -242,49 +247,10 @@ class QuantumIR:
 
     def visualize_paths_dataframe(self) -> None:
         """Display a dataframe of register usage across timesteps."""
-        if self.write_in_place_module is None:
+        if self.paths_df is None:
             raise RuntimeError("Must call run_enforce_write_in_place first")
-        func = next(iter(self.write_in_place_module.ops))
-        block = func.body.blocks[0]
-
-        ops = list(block.ops)
-
-        # Discover all register ids and paths present in the block.
-        reg_paths: dict[int, set[int]] = {}
-        for op in ops:
-            rid_attr = op.properties.get("reg_id")
-            rpath_attr = op.properties.get("reg_path")
-            if rid_attr is None or rpath_attr is None:
-                continue
-            rid = int(rid_attr.data)
-            path = int(rpath_attr.value.data)
-            reg_paths.setdefault(rid, set()).add(path)
-
-        columns: list[str] = []
-        for rid in sorted(reg_paths.keys()):
-            for path in sorted(reg_paths[rid]):
-                columns.append(f"r{rid}_p{path}")
-
-        df = pd.DataFrame("", index=range(len(ops)), columns=columns)
-
-        result_counter = 0
-        for step, op in enumerate(ops):
-            rid_attr = op.properties.get("reg_id")
-            rpath_attr = op.properties.get("reg_path")
-            comment = op.attributes.get("c_comment")
-            if rid_attr is not None and rpath_attr is not None:
-                rid = int(rid_attr.data)
-                path = int(rpath_attr.value.data)
-                text = f"%{result_counter}"
-                if comment is not None:
-                    text += f" // {comment}"
-                col = f"r{rid}_p{path}"
-                df.loc[step, col] = text
-            result_counter += len(op.results)
-
-        with pd.option_context("display.max_columns", None,
-                                "display.width", None):
-            print(df.fillna(""))
+        with pd.option_context("display.max_columns", None, "display.width", None):
+            print(self.paths_df.fillna(""))
 
 
 if __name__ == "__main__":
