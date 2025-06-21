@@ -29,6 +29,7 @@ from mlir_generator import MLIRGenerator
 
 from quantum_translate import QuantumTranslator
 from paths_dataframe import build_paths_dataframe
+from ssa_dag import build_dag, visualize_dag, enforce_constraints
 
 
 class QuantumPrinter(Printer):
@@ -147,6 +148,12 @@ class QuantumIR:
         self.write_in_place_module: ModuleOp | None = None
         # DataFrame visualizing register paths
         self.paths_df: pd.DataFrame | None = None
+        # SSA DAG built from the write-in-place IR
+        self.dag = None
+        # Module after enforcing additional quantum constraints
+        self.compliant_module: ModuleOp | None = None
+        # DataFrame for the compliant module
+        self.compliant_df: pd.DataFrame | None = None
 
         if not os.path.exists(self.json_path):
             raise FileNotFoundError(f"Input JSON file not found: {self.json_path}")
@@ -258,6 +265,36 @@ class QuantumIR:
             print(self.paths_df.fillna(""))
             print("=" * 35)
 
+    # ------------------------------------------------------------------
+    def build_ssa_dag(self) -> None:
+        """Construct the SSA DAG from the write-in-place module."""
+        if self.write_in_place_module is None:
+            raise RuntimeError("Must call run_enforce_write_in_place first")
+        self.dag = build_dag(self.write_in_place_module)
+
+    def visualize_dag(self, filename: str) -> None:
+        """Save an image of the SSA DAG to ``filename``."""
+        if self.dag is None:
+            raise RuntimeError("Must call build_ssa_dag first")
+        visualize_dag(self.dag, filename)
+
+    def run_enforce_quantum_constraints(self) -> None:
+        """Rewrite the DAG to satisfy quantum constraints."""
+        if self.write_in_place_module is None:
+            raise RuntimeError("Must call run_enforce_write_in_place first")
+        self.compliant_module = enforce_constraints(self.write_in_place_module)
+        self.compliant_df = build_paths_dataframe(self.compliant_module)
+        self.dag = build_dag(self.compliant_module)
+
+    def visualize_compliant_dataframe(self) -> None:
+        """Display the register table after constraint enforcement."""
+        if self.compliant_df is None:
+            raise RuntimeError("Must call run_enforce_quantum_constraints first")
+        with pd.option_context("display.max_columns", None, "display.width", None):
+            print("=== Quantum-Compliant DataFrame ===")
+            print(self.compliant_df.fillna(""))
+            print("=" * 35)
+
 
 if __name__ == "__main__":
     try:
@@ -272,6 +309,11 @@ if __name__ == "__main__":
         pipeline.run_enforce_write_in_place()
         pipeline.visualize_write_in_place_ir()
         pipeline.visualize_paths_dataframe()
+        pipeline.build_ssa_dag()
+        pipeline.visualize_dag("output/dag_before.png")
+        pipeline.run_enforce_quantum_constraints()
+        pipeline.visualize_dag("output/dag_after.png")
+        pipeline.visualize_compliant_dataframe()
     except Exception as e:
         print("Error in the execution of the program:", e)
         raise
