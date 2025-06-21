@@ -35,7 +35,7 @@ The compilation process performed by `pipeline.py` consists of four stages:
 2. **MLIR Generation** – `mlir_generator.MLIRGenerator` walks those dataclasses and emits standard MLIR using the xDSL API.  Operations with constant immediates make use of custom ops defined in `dialect_ops.py`.
 3. **Write-in-Place Enforcement** – `quantum_translate.QuantumTranslator` analyzes the classical MLIR and rewrites it into the quantum dialect defined in `quantum_dialect.py` while enforcing write-in-place semantics.  Each integer variable becomes a quantum register, and arithmetic operations overwrite their left operand using versioned paths to avoid clobbering existing values.
 4. **Printing** – xDSL's `Printer` utility is used to display the generated modules.
-5. **Path Visualization** – `paths_dataframe.build_paths_dataframe` constructs a pandas DataFrame showing register usage which is stored on `QuantumIR.paths_df`.
+5. **Path Visualization** – `paths_dataframe.build_paths_dataframe` constructs a pandas DataFrame showing register usage which is stored on `QuantumIR.paths_df`. The table now includes an additional `operation` column describing the computation performed at each timestep.
 
 Running the pipeline will therefore produce two MLIR modules: the direct lowering from C and a write-in-place version expressed with quantum-style operations.
 
