@@ -16,15 +16,31 @@ import json
 import os
 import sys
 
-from xdsl.ir import Block, Region
+from xdsl.ir import Block, Region, Operation
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.printer import Printer
+from quantum_dialect import _annotate_value
 
 
 from c_ast import TranslationUnit, parse_ast, pretty_print_translation_unit
 from mlir_generator import MLIRGenerator
 
 from quantum_translate import QuantumTranslator
+
+
+class QuantumPrinter(Printer):
+    """Printer annotating SSA values with register information."""
+
+    def _print_results(self, op: Operation) -> None:  # type: ignore[override]
+        results = op.results
+        if len(results) == 0:
+            return
+        for i, res in enumerate(results):
+            if i != 0:
+                self.print_string(", ")
+            self.print_ssa_value(res)
+            self.print_string(_annotate_value(res))
+        self.print_string(" = ")
 
 class QuantumIR:
     """High-level pipeline orchestrating JSON -> MLIR generation.
@@ -116,7 +132,7 @@ class QuantumIR:
         if self.module is None:
             raise RuntimeError("Must call run_generate_ir first")
         # Dump the module using the xDSL printer.
-        Printer().print_op(self.module)
+        QuantumPrinter().print_op(self.module)
         print()
 
     def run_generate_intermediate_ir(self) -> None:
@@ -133,6 +149,8 @@ class QuantumIR:
         # Run the translator to produce quantum-inspired operations.
         translator = QuantumTranslator(self.module)
         self.intermediate_module = translator.translate()
+        # Verify that all write-in-place invariants hold.
+        self.intermediate_module.verify()
         print("Intermediate MLIR successfully generated.")
 
     def visualize_intermediate_ir(self) -> None:
@@ -140,7 +158,7 @@ class QuantumIR:
         if self.intermediate_module is None:
             raise RuntimeError("Must call run_generate_intermediate_ir first")
         # Display the module that uses the intermediate dialect.
-        Printer().print_op(self.intermediate_module)
+        QuantumPrinter().print_op(self.intermediate_module)
         print()
 
 

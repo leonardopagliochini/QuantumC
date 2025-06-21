@@ -31,6 +31,23 @@ from xdsl.utils.exceptions import VerifyException
 from xdsl.dialects.builtin import StringAttr
 
 
+def _annotate_value(val: SSAValue) -> str:
+    """Return formatted register info for ``val`` if available."""
+    owner = val.owner
+    if owner is None:
+        return ""
+    rid = owner.properties.get("reg_id")
+    rver = owner.properties.get("reg_version")
+    rpath = owner.properties.get("reg_path")
+    if (
+        isinstance(rid, StringAttr)
+        and isinstance(rver, IntegerAttr)
+        and isinstance(rpath, IntegerAttr)
+    ):
+        return f' {{id = "{rid.data}", v = {rver.value.data}, p = {rpath.value.data}}}'
+    return ""
+
+
 # TRAITS COULD BE INTRESTING TO BE EXPLORED MORE OR CUSTOMIZED for quantum operations
 # purity makes no sense for quantum register because of: writing in place of the resul on one of the operands, no-cloning theorem
 # from xdsl.traits import Pure
@@ -62,6 +79,21 @@ class WriteInPlace(OpTrait):
                 f"reg_id mismatch: lhs={lhs_reg}, op={op_reg}"
             )
 
+        lhs_ver = None
+        op_ver = op.properties.get("reg_version")
+        if isinstance(lhs_owner, Operation):
+            lhs_ver = lhs_owner.properties.get("reg_version")
+        if (
+            lhs_ver is not None
+            and op_ver is not None
+            and isinstance(lhs_ver, IntegerAttr)
+            and isinstance(op_ver, IntegerAttr)
+            and op_ver != IntegerAttr.from_int_and_width(lhs_ver.value.data + 1, 32)
+        ):
+            raise VerifyException(
+                f"reg_version mismatch: lhs={lhs_ver}, op={op_ver}"
+            )
+
 
 
 
@@ -87,11 +119,12 @@ class QuantumInitOp(IRDLOperation):
     value = prop_def(TypedAttributeConstraint(IntegerAttr.constr(), T))
     reg_id = prop_def(StringAttr)  # <-- Register id
     reg_version = prop_def(IntegerAttr)  # <-- Register version
+    reg_path = prop_def(IntegerAttr)  # <-- Register path
 
     irdl_options = [ParsePropInAttrDict()]
     assembly_format = None
 
-    def __init__(self, value: int | IntegerAttr, reg_id: str, reg_version: int = 0, result_type: Attribute = i32):
+    def __init__(self, value: int | IntegerAttr, reg_id: str, reg_version: int = 0, reg_path: int = 0, result_type: Attribute = i32):
         """Initialize the operation with ``value`` as the register contents."""
         if isinstance(value, int):
             value = IntegerAttr.from_int_and_width(value, 32)
@@ -101,13 +134,12 @@ class QuantumInitOp(IRDLOperation):
                 "value": value,
                 "reg_id": StringAttr(reg_id),
                 "reg_version": IntegerAttr.from_int_and_width(reg_version, 32),
+                "reg_path": IntegerAttr.from_int_and_width(reg_path, 32),
             }
         )
 
     def print(self, printer: Printer) -> None:
-        printer.print(" {")
-        printer.print(f'reg_id = "{self.reg_id.data}", reg_version = {self.reg_version.value.data}')
-        printer.print("} ")
+        printer.print(" ")
         self.value.print_without_type(printer)
         printer.print(" : ")
         printer.print_attribute(self.result.type)
@@ -124,13 +156,14 @@ class QuantumBinaryBase(IRDLOperation, abc.ABC):
     result = result_def(T)
     reg_id = prop_def(StringAttr)  # <-- register id
     reg_version = prop_def(IntegerAttr)
+    reg_path = prop_def(IntegerAttr)
 
     irdl_options = [ParsePropInAttrDict()]
     traits = traits_def(WriteInPlace())
 
     assembly_format = None
 
-    def __init__(self, lhs: SSAValue, rhs: SSAValue, reg_id: str, reg_version: int, result_type: Attribute | None = None):
+    def __init__(self, lhs: SSAValue, rhs: SSAValue, reg_id: str, reg_version: int, reg_path: int, result_type: Attribute | None = None):
         """Create the operation using ``lhs`` and ``rhs`` operands."""
         if result_type is None:
             result_type = lhs.type
@@ -140,17 +173,18 @@ class QuantumBinaryBase(IRDLOperation, abc.ABC):
             properties={
                 "reg_id": StringAttr(reg_id),
                 "reg_version": IntegerAttr.from_int_and_width(reg_version, 32),
+                "reg_path": IntegerAttr.from_int_and_width(reg_path, 32),
             }
         )
 
     def print(self, printer: Printer) -> None:
         printer.print(" ")
         printer.print_operand(self.lhs)
+        printer.print(_annotate_value(self.lhs))
         printer.print(", ")
         printer.print_operand(self.rhs)
-        printer.print(" {")
-        printer.print(f'reg_id = "{self.reg_id.data}", reg_version = {self.reg_version.value.data}')
-        printer.print("} : ")
+        printer.print(_annotate_value(self.rhs))
+        printer.print(" : ")
         printer.print_attribute(self.result.type)
 
 
@@ -193,12 +227,13 @@ class QuantumBinaryImmBase(IRDLOperation, abc.ABC):
     imm = prop_def(IntegerAttr)
     reg_id = prop_def(StringAttr)
     reg_version = prop_def(IntegerAttr)
+    reg_path = prop_def(IntegerAttr)
 
     irdl_options = [ParsePropInAttrDict()]
     traits = traits_def(WriteInPlace())
     assembly_format = None
 
-    def __init__(self, lhs: SSAValue, imm: int | IntegerAttr, reg_id: str, reg_version: int, result_type: Attribute | None = None):
+    def __init__(self, lhs: SSAValue, imm: int | IntegerAttr, reg_id: str, reg_version: int, reg_path: int, result_type: Attribute | None = None):
         """Create a binary operation with an immediate operand."""
         if isinstance(imm, int):
             imm = IntegerAttr.from_int_and_width(imm, 32)
@@ -211,6 +246,7 @@ class QuantumBinaryImmBase(IRDLOperation, abc.ABC):
                 "imm": imm,
                 "reg_id": StringAttr(reg_id),
                 "reg_version": IntegerAttr.from_int_and_width(reg_version, 32),
+                "reg_path": IntegerAttr.from_int_and_width(reg_path, 32),
             }
         )
 
@@ -227,23 +263,30 @@ class QuantumBinaryImmBase(IRDLOperation, abc.ABC):
 
         reg_id_attr = None
         reg_ver_attr = None
+        reg_path_attr = None
         if attrs is not None:
             reg_id_attr = attrs.get("reg_id")
             reg_ver_attr = attrs.get("reg_version")
+            reg_path_attr = attrs.get("reg_path")
 
         if not isinstance(reg_id_attr, StringAttr) or not isinstance(reg_ver_attr, IntegerAttr):
             parser.raise_error("expected 'reg_id' and 'reg_version' attributes", parser.pos)
+        if reg_path_attr is None:
+            reg_path = 0
+        elif not isinstance(reg_path_attr, IntegerAttr):
+            parser.raise_error("expected integer 'reg_path' attribute", parser.pos)
+        else:
+            reg_path = int(reg_path_attr.data)
 
-        return cls(lhs, int(imm_val), reg_id_attr.data, int(reg_ver_attr.data), ty)
+        return cls(lhs, int(imm_val), reg_id_attr.data, int(reg_ver_attr.data), reg_path, ty)
 
     def print(self, printer: Printer) -> None:
         printer.print(" ")
         printer.print_operand(self.lhs)
+        printer.print(_annotate_value(self.lhs))
         printer.print(", ")
         self.imm.print_without_type(printer)
-        printer.print(" {")
-        printer.print(f'reg_id = "{self.reg_id.data}", reg_version = {self.reg_version.value.data}')
-        printer.print("} : ")
+        printer.print(" : ")
         printer.print_attribute(self.result.type)
 
 
