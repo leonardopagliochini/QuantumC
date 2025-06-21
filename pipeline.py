@@ -5,10 +5,9 @@
 """Command-line interface driving the MLIR generation pipeline.
 
 The :class:`QuantumIR` class orchestrates all phases: parsing the JSON AST into
-dataclasses, lowering them to MLIR, producing an intermediate representation
-between classical and quantum, and finally printing the results.  This module
-also acts as a small CLI entry point wiring those pieces together when executed
-as a script.
+dataclasses, lowering them to MLIR, enforcing write-in-place semantics on the
+quantum dialect, and finally printing the results. This module also acts as a
+small CLI entry point wiring those pieces together when executed as a script.
 """
 
 from __future__ import annotations
@@ -67,8 +66,8 @@ class QuantumIR:
         self.root: TranslationUnit | None = None
         # MLIR module for classic MLIR
         self.module: ModuleOp | None = None
-        # MLIR module for the intermediate quantum representation
-        self.intermediate_module: ModuleOp | None = None
+        # MLIR module after write-in-place enforcement
+        self.write_in_place_module: ModuleOp | None = None
 
         if not os.path.exists(self.json_path):
             raise FileNotFoundError(f"Input JSON file not found: {self.json_path}")
@@ -135,8 +134,8 @@ class QuantumIR:
         QuantumPrinter().print_op(self.module)
         print()
 
-    def run_generate_intermediate_ir(self) -> None:
-        """Translate standard MLIR to the intermediate quantum dialect.
+    def run_enforce_write_in_place(self) -> None:
+        """Translate classical MLIR and enforce write-in-place semantics.
 
         Raises
         ------
@@ -148,18 +147,18 @@ class QuantumIR:
         
         # Run the translator to produce quantum-inspired operations.
         translator = QuantumTranslator(self.module)
-        self.intermediate_module = translator.translate()
-        # Verify that all write-in-place invariants hold.
-        self.intermediate_module.verify()
-        print("Intermediate MLIR successfully generated.")
 
-    def visualize_intermediate_ir(self) -> None:
-        """Print the intermediate MLIR bridging classical and quantum."""
-        if self.intermediate_module is None:
-            raise RuntimeError("Must call run_generate_intermediate_ir first")
-        # Display the module that uses the intermediate dialect.
-        QuantumPrinter().print_op(self.intermediate_module)
-        print()
+        self.write_in_place_module = translator.translate()
+        # Verify that all write-in-place invariants hold.
+        self.write_in_place_module.verify()
+        print("Write-in-place MLIR successfully generated.")
+
+    def visualize_write_in_place_ir(self) -> None:
+        """Print the IR after write-in-place enforcement."""
+        if self.write_in_place_module is None:
+            raise RuntimeError("Must call run_enforce_write_in_place first")
+        # Display the module that uses the enforced dialect.
+        QuantumPrinter().print_op(self.write_in_place_module)
 
 
 if __name__ == "__main__":
@@ -172,8 +171,8 @@ if __name__ == "__main__":
         pipeline.pretty_print_source()
         pipeline.run_generate_ir()
         pipeline.visualize_ir()
-        pipeline.run_generate_intermediate_ir()
-        pipeline.visualize_intermediate_ir()
+        pipeline.run_enforce_write_in_place()
+        pipeline.visualize_write_in_place_ir()
     except Exception as e:
         print("Error in the execution of the program:", e)
         raise

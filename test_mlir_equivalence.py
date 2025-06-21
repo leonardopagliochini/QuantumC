@@ -1,4 +1,4 @@
-"""Check that classical and intermediate MLIR evaluate to the same result."""
+"""Check that classical MLIR and write-in-place MLIR compute the same result."""
 
 from __future__ import annotations
 
@@ -147,13 +147,13 @@ def compare(path: str) -> None:
     pipeline.run_dataclass()
     pipeline.run_generate_ir()
     classical = pipeline.module
-    pipeline.run_generate_intermediate_ir()
-    intermediate = pipeline.intermediate_module
+    pipeline.run_enforce_write_in_place()
+    wip_module = pipeline.write_in_place_module
 
     classical_res = run_module(classical)
-    intermediate_res = run_module(intermediate)
-    print(f"{path}: classical={classical_res}, intermediate={intermediate_res}")
-    assert classical_res == intermediate_res
+    wip_res = run_module(wip_module)
+    print(f"{path}: classical={classical_res}, write_in_place={wip_res}")
+    assert classical_res == wip_res
 
 
 if __name__ == "__main__":
