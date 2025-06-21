@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, Set
 
 from xdsl.dialects.builtin import ModuleOp, i32
 from xdsl.dialects.func import FuncOp, ReturnOp
@@ -49,6 +49,9 @@ class QuantumTranslator:
         self.reg_version: Dict[int, int] = {}
         # Map (register id, version) -> next available path index
         self.path_counter: Dict[tuple[int, int], int] = {}
+        # Track triples (register id, version, path) already assigned to avoid
+        # duplicates when splitting register paths.
+        self.used_paths: Set[tuple[int, int, int]] = set()
 
         # Map each classical SSA value to the register/value tracking info
         self.val_info: Dict[SSAValue, ValueInfo] = {}
@@ -91,6 +94,14 @@ class QuantumTranslator:
         self.path_counter[(r, 0)] = 0
         return r
 
+    def next_path(self, reg: int, version: int) -> int:
+        """Return a unique path index for the given register version."""
+        path = self.path_counter.get((reg, version), 0)
+        while (reg, version, path) in self.used_paths:
+            path += 1
+        self.path_counter[(reg, version)] = path + 1
+        return path
+
     # ------------------------------------------------------------------
     def translate_func(self, func: FuncOp) -> FuncOp:
         """Translate a single function to the quantum dialect."""
@@ -103,13 +114,13 @@ class QuantumTranslator:
         for op in block.ops:
             if isinstance(op, ConstantOp):
                 reg = self.allocate_reg()
-                path = self.path_counter[(reg, 0)]
+                path = self.next_path(reg, 0)
                 q_op = QuantumInitOp(op.value.value.data, str(reg), 0, path)
                 comment = op.attributes.get("c_comment")
                 if comment is not None:
                     q_op.attributes["c_comment"] = comment
                 self.current_block.add_op(q_op)
-                self.path_counter[(reg, 0)] = path + 1
+                self.used_paths.add((reg, 0, path))
                 self.val_info[op.results[0]] = ValueInfo(reg, 0, path, q_op.results[0])
 
             elif isinstance(op, (AddiOp, SubiOp, MuliOp, DivSIOp)):
@@ -130,7 +141,7 @@ class QuantumTranslator:
                 # Always overwrite the left operand's register.
                 target_reg = lhs_info.reg
                 version = lhs_info.version + 1
-                path = self.path_counter.get((target_reg, version), 0)
+                path = self.next_path(target_reg, version)
                 first = q_lhs
                 second = q_rhs
 
@@ -140,7 +151,7 @@ class QuantumTranslator:
                     q_op.attributes["c_comment"] = comment
                 self.current_block.add_op(q_op)
                 self.reg_version[target_reg] = version
-                self.path_counter[(target_reg, version)] = path + 1
+                self.used_paths.add((target_reg, version, path))
                 self.val_info[op.results[0]] = ValueInfo(target_reg, version, path, q_op.results[0])
 
             elif op.name in (
@@ -165,7 +176,7 @@ class QuantumTranslator:
                 # Immediate form also overwrites the left operand.
                 target_reg = lhs_info.reg
                 version = lhs_info.version + 1
-                path = self.path_counter.get((target_reg, version), 0)
+                path = self.next_path(target_reg, version)
 
                 q_op = self.create_binary_imm_op(opcode, q_lhs, imm, target_reg, version, path)
                 comment = op.attributes.get("c_comment")
@@ -173,7 +184,7 @@ class QuantumTranslator:
                     q_op.attributes["c_comment"] = comment
                 self.current_block.add_op(q_op)
                 self.reg_version[target_reg] = version
-                self.path_counter[(target_reg, version)] = path + 1
+                self.used_paths.add((target_reg, version, path))
                 self.val_info[op.results[0]] = ValueInfo(target_reg, version, path, q_op.results[0])
 
             elif isinstance(op, ReturnOp):
