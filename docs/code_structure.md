@@ -7,6 +7,7 @@ mlir_generator.py  - converts AST dataclasses into MLIR IR
 quantum_translate.py - enforces write-in-place semantics on the quantum dialect
 quantum_dialect.py - defines the custom quantum dialect operations
 dialect_ops.py     - helper operations used during translation
+paths_dataframe.py - utilities building the register path DataFrame
 c_ast.py           - dataclass representation of the C-like AST
 astJsonGen.py      - helper that invokes clang to produce JSON AST files
 generate_ast.py    - script that runs `astJsonGen` over `c_code`
