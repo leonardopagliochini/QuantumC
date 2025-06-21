@@ -85,18 +85,31 @@ class QuantumInitOp(IRDLOperation):
     # Initial value of the register stored as a property.
     value = prop_def(TypedAttributeConstraint(IntegerAttr.constr(), T))
     reg_id = prop_def(StringAttr)  # <-- Register id
+    reg_version = prop_def(IntegerAttr)  # <-- Register version
 
     irdl_options = [ParsePropInAttrDict()]
-    assembly_format = "attr-dict $value"
+    assembly_format = None
 
-    def __init__(self, value: int | IntegerAttr, reg_id: str, result_type: Attribute = i32):
+    def __init__(self, value: int | IntegerAttr, reg_id: str, reg_version: int = 0, result_type: Attribute = i32):
         """Initialize the operation with ``value`` as the register contents."""
         if isinstance(value, int):
             value = IntegerAttr.from_int_and_width(value, 32)
         super().__init__(
             result_types=[result_type],
-            properties={"value": value, "reg_id": StringAttr(reg_id)}  # <-- updated
+            properties={
+                "value": value,
+                "reg_id": StringAttr(reg_id),
+                "reg_version": IntegerAttr.from_int_and_width(reg_version, 32),
+            }
         )
+
+    def print(self, printer: Printer) -> None:
+        printer.print(" {")
+        printer.print(f'reg_id = "{self.reg_id.data}", reg_version = {self.reg_version.value.data}')
+        printer.print("} ")
+        self.value.print_without_type(printer)
+        printer.print(" : ")
+        printer.print_attribute(self.result.type)
 
 
 
@@ -109,21 +122,35 @@ class QuantumBinaryBase(IRDLOperation, abc.ABC):
     rhs = operand_def(T)
     result = result_def(T)
     reg_id = prop_def(StringAttr)  # <-- register id
+    reg_version = prop_def(IntegerAttr)
 
     irdl_options = [ParsePropInAttrDict()]
     traits = traits_def(WriteInPlace())
 
-    assembly_format = "$lhs `,` $rhs attr-dict `:` type($result)"
+    assembly_format = None
 
-    def __init__(self, lhs: SSAValue, rhs: SSAValue, reg_id: str, result_type: Attribute | None = None):
+    def __init__(self, lhs: SSAValue, rhs: SSAValue, reg_id: str, reg_version: int, result_type: Attribute | None = None):
         """Create the operation using ``lhs`` and ``rhs`` operands."""
         if result_type is None:
             result_type = lhs.type
         super().__init__(
             operands=[lhs, rhs],
             result_types=[result_type],
-            properties={"reg_id": StringAttr(reg_id)}  # <-- updated
+            properties={
+                "reg_id": StringAttr(reg_id),
+                "reg_version": IntegerAttr.from_int_and_width(reg_version, 32),
+            }
         )
+
+    def print(self, printer: Printer) -> None:
+        printer.print(" ")
+        printer.print_operand(self.lhs)
+        printer.print(", ")
+        printer.print_operand(self.rhs)
+        printer.print(" {")
+        printer.print(f'reg_id = "{self.reg_id.data}", reg_version = {self.reg_version.value.data}')
+        printer.print("} : ")
+        printer.print_attribute(self.result.type)
 
 
 
@@ -163,13 +190,14 @@ class QuantumBinaryImmBase(IRDLOperation, abc.ABC):
     lhs = operand_def(T)
     result = result_def(T)
     imm = prop_def(IntegerAttr)
-    reg_id = prop_def(StringAttr)  # <-- NEW
+    reg_id = prop_def(StringAttr)
+    reg_version = prop_def(IntegerAttr)
 
     irdl_options = [ParsePropInAttrDict()]
     traits = traits_def(WriteInPlace())
     assembly_format = None
 
-    def __init__(self, lhs: SSAValue, imm: int | IntegerAttr, reg_id: str, result_type: Attribute | None = None):
+    def __init__(self, lhs: SSAValue, imm: int | IntegerAttr, reg_id: str, reg_version: int, result_type: Attribute | None = None):
         """Create a binary operation with an immediate operand."""
         if isinstance(imm, int):
             imm = IntegerAttr.from_int_and_width(imm, 32)
@@ -180,7 +208,8 @@ class QuantumBinaryImmBase(IRDLOperation, abc.ABC):
             result_types=[result_type],
             properties={
                 "imm": imm,
-                "reg_id": StringAttr(reg_id)  # <-- updated
+                "reg_id": StringAttr(reg_id),
+                "reg_version": IntegerAttr.from_int_and_width(reg_version, 32),
             }
         )
 
@@ -195,20 +224,24 @@ class QuantumBinaryImmBase(IRDLOperation, abc.ABC):
         (lhs,) = parser.resolve_operands([lhs], [ty], parser.pos)
 
         reg_id_attr = None
+        reg_ver_attr = None
         if attrs is not None:
             reg_id_attr = attrs.get("reg_id")
+            reg_ver_attr = attrs.get("reg_version")
 
-        if not isinstance(reg_id_attr, StringAttr):
-            parser.raise_error("expected 'reg_id' attribute", parser.pos)
+        if not isinstance(reg_id_attr, StringAttr) or not isinstance(reg_ver_attr, IntegerAttr):
+            parser.raise_error("expected 'reg_id' and 'reg_version' attributes", parser.pos)
 
-        return cls(lhs, int(imm_val), reg_id_attr.data, ty)
+        return cls(lhs, int(imm_val), reg_id_attr.data, int(reg_ver_attr.data), ty)
 
     def print(self, printer: Printer) -> None:
         printer.print(" ")
         printer.print_operand(self.lhs)
         printer.print(", ")
         self.imm.print_without_type(printer)
-        printer.print(" : ")
+        printer.print(" {")
+        printer.print(f'reg_id = "{self.reg_id.data}", reg_version = {self.reg_version.value.data}')
+        printer.print("} : ")
         printer.print_attribute(self.result.type)
 
 
