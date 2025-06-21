@@ -116,6 +116,12 @@ def visualize_dag(g: nx.DiGraph, path: str) -> None:
     plt.savefig(path)
     plt.close()
 
+def save_dag_dot(g: nx.DiGraph, path: str) -> None:
+    """Write ``g`` to ``path`` in GraphViz DOT format."""
+    from networkx.drawing.nx_agraph import write_dot
+
+    write_dot(g, path)
+
 # -----------------------------------------------------------------------------
 # Quantum Constraint Enforcement
 # -----------------------------------------------------------------------------

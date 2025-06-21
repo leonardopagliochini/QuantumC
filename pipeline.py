@@ -29,7 +29,7 @@ from mlir_generator import MLIRGenerator
 
 from quantum_translate import QuantumTranslator
 from paths_dataframe import build_paths_dataframe
-from ssa_dag import build_dag, visualize_dag, enforce_constraints
+from ssa_dag import build_dag, visualize_dag, enforce_constraints, save_dag_dot
 
 
 class QuantumPrinter(Printer):
@@ -283,6 +283,12 @@ class QuantumIR:
             raise RuntimeError("Must call build_ssa_dag first")
         visualize_dag(self.dag, filename)
 
+    def save_dag_dot(self, filename: str) -> None:
+        """Write the SSA DAG to ``filename`` in DOT format."""
+        if self.dag is None:
+            raise RuntimeError("Must call build_ssa_dag first")
+        save_dag_dot(self.dag, filename)
+
     def run_enforce_quantum_constraints(self) -> None:
         """Rewrite the DAG to satisfy quantum constraints."""
         if self.write_in_place_module is None:
@@ -321,8 +327,10 @@ if __name__ == "__main__":
         pipeline.visualize_paths_dataframe()
         pipeline.build_ssa_dag()
         pipeline.visualize_dag("output/dag_before.png")
+        pipeline.save_dag_dot("output/dag_before.dot")
         pipeline.run_enforce_quantum_constraints()
         pipeline.visualize_dag("output/dag_after.png")
+        pipeline.save_dag_dot("output/dag_after.dot")
         pipeline.visualize_compliant_dataframe()
     except Exception as e:
         print("Error in the execution of the program:", e)
