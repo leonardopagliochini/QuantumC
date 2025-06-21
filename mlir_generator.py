@@ -101,15 +101,15 @@ class MLIRGenerator:
             return op.results[0]
 
         if isinstance(expr, BinaryOperatorWithImmediate):
-            # Identify which side of the expression is the immediate.
-            if isinstance(expr.lhs, IntegerLiteral):
-                imm = expr.lhs.value
-                lhs_val = self.process_expression(expr.rhs)
-            else:
-                imm = expr.rhs.value
-                lhs_val = self.process_expression(expr.lhs)
+            # Determine which side holds the immediate value and whether the
+            # operation is commutative so that we can use the immediate form
+            # when possible.
+            imm_on_left = isinstance(expr.lhs, IntegerLiteral)
+            imm_val = expr.lhs.value if imm_on_left else expr.rhs.value
+            other_expr = expr.rhs if imm_on_left else expr.lhs
+            other_val = self.process_expression(other_expr)
 
-            # Choose the appropriate immediate operation.
+            # Mapping from opcode to the immediate operation class.
             op_map = {
                 '+': AddiImmOp,
                 '-': SubiImmOp,
@@ -118,8 +118,22 @@ class MLIRGenerator:
             }
             op_cls = op_map.get(expr.opcode)
             if op_cls is None:
-                raise ValueError(f"Unsupported binary operator with immediate: {expr.opcode}")
-            op = op_cls(lhs_val, imm)
+                raise ValueError(
+                    f"Unsupported binary operator with immediate: {expr.opcode}"
+                )
+
+            # ``addi`` and ``muli`` are commutative so we can swap operands even
+            # when the immediate appears on the left. For subtraction and
+            # division we fall back to the non-immediate variant if the constant
+            # is the left operand.
+            if imm_on_left and expr.opcode in {'-', '/'}:
+                const_op = ConstantOp.from_int_and_width(imm_val, 32)
+                self.current_block.add_op(const_op)
+                std_cls = {"-": SubiOp, "/": DivSIOp}[expr.opcode]
+                op = std_cls(const_op.results[0], other_val)
+            else:
+                op = op_cls(other_val, imm_val)
+
             self.current_block.add_op(op)
             return op.results[0]
 
