@@ -212,7 +212,9 @@ class QuantumIR:
         buf = StringIO()
         QuantumPrinter(stream=buf).print_op(self.module)
         formatted = pretty_print_mlir_lines(buf.getvalue().splitlines())
+        print("=== Classical MLIR ===")
         print(formatted)
+        print("=" * 35)
         print()
 
     def run_enforce_write_in_place(self) -> None:
@@ -243,14 +245,18 @@ class QuantumIR:
         buf = StringIO()
         QuantumPrinter(stream=buf).print_op(self.write_in_place_module)
         formatted = pretty_print_mlir_lines(buf.getvalue().splitlines())
+        print("=== Write-In-Place MLIR ===")
         print(formatted)
+        print("=" * 35)
 
     def visualize_paths_dataframe(self) -> None:
         """Display a dataframe of register usage across timesteps."""
         if self.paths_df is None:
             raise RuntimeError("Must call run_enforce_write_in_place first")
         with pd.option_context("display.max_columns", None, "display.width", None):
+            print("=== Register Paths DataFrame ===")
             print(self.paths_df.fillna(""))
+            print("=" * 35)
 
 
 if __name__ == "__main__":
