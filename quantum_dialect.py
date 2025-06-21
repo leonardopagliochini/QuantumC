@@ -23,13 +23,43 @@ from xdsl.irdl import (
     prop_def,
     traits_def,
 )
+from xdsl.ir import Operation
+from xdsl.traits import Trait
+from xdsl.dialects.builtin import StringAttr
+
 
 # TRAITS COULD BE INTRESTING TO BE EXPLORED MORE OR CUSTOMIZED for quantum operations
 # purity makes no sense for quantum register because of: writing in place of the resul on one of the operands, no-cloning theorem
 # from xdsl.traits import Pure
 
+
+
+################ 
+# CUSTOM TRAITS
+################
+
+class WriteInPlace(Trait):
+    """Trait to enforce that result rewrites the first operand (in-place update)."""
+    def verify(self, op: Operation):
+        if op.operands[0] is not op.results[0]:
+            raise Exception("Operation must write in-place: result must alias lhs.")
+        lhs_reg = op.operands[0].owner.properties.get("reg_id")
+        result_reg = op.properties.get("reg_id")
+        if lhs_reg != result_reg:
+            raise Exception(f"reg_id mismatch: lhs={lhs_reg}, result={result_reg}")
+
+
+
+
+################ 
+# CHECKS
+################
+
 # Matcher used to ensure operands are signless integers or indices.
 signlessIntegerLike = AnyOf([IntegerType, IndexType])
+
+
+
 
 @irdl_op_definition
 class QuantumInitOp(IRDLOperation):
@@ -41,37 +71,46 @@ class QuantumInitOp(IRDLOperation):
     result = result_def(T)
     # Initial value of the register stored as a property.
     value = prop_def(TypedAttributeConstraint(IntegerAttr.constr(), T))
-
-    # purity makes no sense in quantum operations
-    # traits = traits_def(Pure())
+    reg_id = prop_def(StringAttr)  # <-- Register id
 
     assembly_format = "attr-dict $value"
 
-    def __init__(self, value: int | IntegerAttr, result_type: Attribute = i32):
+    def __init__(self, value: int | IntegerAttr, reg_id: str, result_type: Attribute = i32):
         """Initialize the operation with ``value`` as the register contents."""
         if isinstance(value, int):
             value = IntegerAttr.from_int_and_width(value, 32)
-        super().__init__(result_types=[result_type], properties={"value": value})
+        super().__init__(
+            result_types=[result_type],
+            properties={"value": value, "reg_id": StringAttr(reg_id)}  # <-- updated
+        )
+
 
 
 class QuantumBinaryBase(IRDLOperation, abc.ABC):
-    """Common base for binary arithmetic operations."""
+    """Base class for binary quantum ops that write in-place to lhs."""
+
     T: ClassVar = VarConstraint("T", signlessIntegerLike)
     # Both operands and the result share the same integer type ``T``.
     lhs = operand_def(T)
     rhs = operand_def(T)
     result = result_def(T)
+    reg_id = prop_def(StringAttr)  # <-- register id
 
-    # purity makes no sense in quantum operations
-    # traits = traits_def(Pure())
-    
+    traits = traits_def(WriteInPlace())
+
     assembly_format = "$lhs `,` $rhs attr-dict `:` type($result)"
 
-    def __init__(self, lhs: SSAValue, rhs: SSAValue, result_type: Attribute | None = None):
+    def __init__(self, lhs: SSAValue, rhs: SSAValue, reg_id: str, result_type: Attribute | None = None):
         """Create the operation using ``lhs`` and ``rhs`` operands."""
         if result_type is None:
             result_type = lhs.type
-        super().__init__(operands=[lhs, rhs], result_types=[result_type])
+        super().__init__(
+            operands=[lhs, rhs],
+            result_types=[result_type],
+            properties={"reg_id": StringAttr(reg_id)}  # <-- updated
+        )
+
+
 
 
 @irdl_op_definition
@@ -103,29 +142,31 @@ class QDivSOp(QuantumBinaryBase):
 
 
 class QuantumBinaryImmBase(IRDLOperation, abc.ABC):
-    """Base class for binary ops with an immediate operand."""
+    """Quantum binary ops with immediate, in-place write."""
 
     T: ClassVar = VarConstraint("T", signlessIntegerLike)
     lhs = operand_def(T)
     result = result_def(T)
-    # Immediate operand stored as a property rather than an SSA value.
     imm = prop_def(IntegerAttr)
+    reg_id = prop_def(StringAttr)  # <-- NEW
 
-    # purity makes no sense in quantum operations
-    # traits = traits_def(Pure())
-    
-    
-    # Custom print/parse so the immediate value is printed without its type.
+    traits = traits_def(WriteInPlace())
     assembly_format = None
 
-    def __init__(self, lhs: SSAValue, imm: int | IntegerAttr, result_type: Attribute | None = None):
+    def __init__(self, lhs: SSAValue, imm: int | IntegerAttr, reg_id: str, result_type: Attribute | None = None):
         """Create a binary operation with an immediate operand."""
-        # Allow passing a Python ``int`` directly for convenience.
         if isinstance(imm, int):
             imm = IntegerAttr.from_int_and_width(imm, 32)
         if result_type is None:
             result_type = lhs.type
-        super().__init__(operands=[lhs], result_types=[result_type], properties={"imm": imm})
+        super().__init__(
+            operands=[lhs],
+            result_types=[result_type],
+            properties={
+                "imm": imm,
+                "reg_id": StringAttr(reg_id)  # <-- updated
+            }
+        )
 
     @classmethod
     def parse(cls, parser: Parser):
@@ -145,6 +186,7 @@ class QuantumBinaryImmBase(IRDLOperation, abc.ABC):
         self.imm.print_without_type(printer)
         printer.print(" : ")
         printer.print_attribute(self.result.type)
+
 
 
 @irdl_op_definition
