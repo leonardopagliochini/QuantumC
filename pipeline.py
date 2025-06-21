@@ -147,6 +147,7 @@ class QuantumIR:
         
         # Run the translator to produce quantum-inspired operations.
         translator = QuantumTranslator(self.module)
+
         self.write_in_place_module = translator.translate()
         # Verify that all write-in-place invariants hold.
         self.write_in_place_module.verify()
@@ -158,7 +159,6 @@ class QuantumIR:
             raise RuntimeError("Must call run_enforce_write_in_place first")
         # Display the module that uses the enforced dialect.
         QuantumPrinter().print_op(self.write_in_place_module)
-        print()
 
 
 if __name__ == "__main__":
