@@ -5,9 +5,9 @@
 """Command-line interface driving the MLIR generation pipeline.
 
 The :class:`QuantumIR` class orchestrates all phases: parsing the JSON AST into
-dataclasses, lowering them to MLIR, enforcing write-in-place semantics on the
-quantum dialect, and finally printing the results. This module also acts as a
-small CLI entry point wiring those pieces together when executed as a script.
+dataclasses, lowering them to MLIR, and printing the result. This module also
+acts as a small CLI entry point wiring those pieces together when executed as a
+script.
 """
 
 from __future__ import annotations
@@ -17,18 +17,14 @@ import sys
 import re
 from io import StringIO
 
-from xdsl.ir import Block, Region, Operation
-import pandas as pd
+from xdsl.ir import Operation
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.printer import Printer
-from quantum_dialect import _annotate_value
 
 
 from c_ast import TranslationUnit, parse_ast, pretty_print_translation_unit
 from mlir_generator import MLIRGenerator
 
-from quantum_translate import QuantumTranslator
-from paths_dataframe import build_paths_dataframe
 
 
 class QuantumPrinter(Printer):
@@ -42,7 +38,6 @@ class QuantumPrinter(Printer):
             if i != 0:
                 self.print_string(", ")
             self.print_ssa_value(res)
-            self.print_string(_annotate_value(res))
         self.print_string(" = ")
 
     # ------------------------------------------------------------------
@@ -143,10 +138,6 @@ class QuantumIR:
         self.root: TranslationUnit | None = None
         # MLIR module for classic MLIR
         self.module: ModuleOp | None = None
-        # MLIR module after write-in-place enforcement
-        self.write_in_place_module: ModuleOp | None = None
-        # DataFrame visualizing register paths
-        self.paths_df: pd.DataFrame | None = None
 
         if not os.path.exists(self.json_path):
             raise FileNotFoundError(f"Input JSON file not found: {self.json_path}")
@@ -217,51 +208,6 @@ class QuantumIR:
         print("=" * 35)
         print()
 
-    def run_enforce_write_in_place(self) -> None:
-        """Translate classical MLIR and enforce write-in-place semantics.
-
-        Raises
-        ------
-        RuntimeError
-            If :meth:`run_generate_ir` has not been executed.
-        """
-        if self.module is None:
-            raise RuntimeError("Must call run_generate_ir first")
-        
-        # Run the translator to produce quantum-inspired operations.
-        translator = QuantumTranslator(self.module)
-
-        self.write_in_place_module = translator.translate()
-        # Verify that all write-in-place invariants hold.
-        self.write_in_place_module.verify()
-        # Build the register usage dataframe for later inspection
-        self.paths_df = build_paths_dataframe(self.write_in_place_module)
-        print("Write-in-place MLIR successfully generated.")
-
-    def visualize_write_in_place_ir(self) -> None:
-        """Print the IR after write-in-place enforcement."""
-        if self.write_in_place_module is None:
-            raise RuntimeError("Must call run_enforce_write_in_place first")
-        buf = StringIO()
-        QuantumPrinter(stream=buf).print_op(self.write_in_place_module)
-        formatted = pretty_print_mlir_lines(buf.getvalue().splitlines())
-        print("=== Write-In-Place MLIR ===")
-        print(formatted)
-        print("=" * 35)
-
-    def visualize_paths_dataframe(self) -> None:
-        """Display a dataframe of register usage across timesteps."""
-        if self.paths_df is None:
-            raise RuntimeError("Must call run_enforce_write_in_place first")
-        if len(self.paths_df.columns) > 10:
-            path = os.path.join(self.output_dir, "register_paths_df.csv")
-            self.paths_df.to_csv(path, index=False)
-            print(f"Register paths DataFrame saved to {path}")
-        else:
-            with pd.option_context("display.max_columns", None, "display.width", None):
-                print("=== Register Paths DataFrame ===")
-                print(self.paths_df.fillna(""))
-                print("=" * 35)
 
 
 
@@ -275,9 +221,6 @@ if __name__ == "__main__":
         pipeline.pretty_print_source()
         pipeline.run_generate_ir()
         pipeline.visualize_ir()
-        pipeline.run_enforce_write_in_place()
-        pipeline.visualize_write_in_place_ir()
-        pipeline.visualize_paths_dataframe()
     except Exception as e:
         print("Error in the execution of the program:", e)
         raise
