@@ -24,6 +24,7 @@ from xdsl.printer import Printer
 
 from c_ast import TranslationUnit, parse_ast, pretty_print_translation_unit
 from mlir_generator import MLIRGenerator
+from dag_builder import IRDependencyDAG
 
 
 
@@ -208,6 +209,16 @@ class QuantumIR:
         print("=" * 35)
         print()
 
+    def build_ir_dag(self) -> None:
+        """Construct and store the dependency DAG of the generated IR."""
+        if self.module is None:
+            raise RuntimeError("Must call run_generate_ir first")
+        dag = IRDependencyDAG(self.module)
+        dag.build()
+        prefix = os.path.join(self.output_dir, "ir_dag")
+        dag.export(prefix)
+        print(f"IR DAG written to {prefix}.png and {prefix}.xdot")
+
 
 
 
@@ -221,6 +232,7 @@ if __name__ == "__main__":
         pipeline.pretty_print_source()
         pipeline.run_generate_ir()
         pipeline.visualize_ir()
+        pipeline.build_ir_dag()
     except Exception as e:
         print("Error in the execution of the program:", e)
         raise
