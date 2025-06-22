@@ -25,15 +25,16 @@ Both scripts rely on the helper modules described below.
    ```bash
    python pipeline.py json_out/try.json
    ```
-   The script prints the reconstructed C source and the generated MLIR to the terminal.
+   The script prints the reconstructed C source and the generated MLIR to the terminal. It also writes a dependency DAG to `output/ir_dag.*`.
 
 ## Pipeline Overview
 
-The compilation process performed by `pipeline.py` consists of three stages:
+The compilation process performed by `pipeline.py` consists of four stages:
 
 1. **JSON Parsing** – `c_ast.parse_ast` converts the Clang generated JSON AST into a hierarchy of lightweight dataclasses such as `FunctionDecl`, `VarDecl`, and `BinaryOperator`.
 2. **MLIR Generation** – `mlir_generator.MLIRGenerator` walks those dataclasses and emits standard MLIR using the xDSL API.  Operations with constant immediates make use of custom ops defined in `dialect_ops.py`.
 3. **Printing** – xDSL's `Printer` utility is used to display the generated modules.
+4. **DAG Extraction** – `dag_builder.py` writes a graph of dependencies between the MLIR operations.
 
 
 ## Project Structure
@@ -60,6 +61,7 @@ Each module exposes small classes and functions with comprehensive docstrings so
 * **dialect_ops.py** – Immediate arithmetic operations used during lowering.
 * **pipeline.py** – Command line driver running the whole compilation pipeline.
 * **mlir_pipeline.py** – Compatibility layer re-exporting frequently used names.
+* **dag_builder.py** – Utility that extracts a dependency DAG from the MLIR.
 
 ## Documentation
 
@@ -69,4 +71,5 @@ Additional documentation describing each stage of the pipeline can be found unde
 - [AST to Dataclasses](docs/ast_to_dataclasses.md)
 - [Classical MLIR Generation](docs/classical_mlir_generation.md)
 - [Overall Pipeline Overview](docs/pipeline_overview.md)
+- [IR Dependency DAG](docs/ir_dag.md)
 
