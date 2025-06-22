@@ -25,7 +25,9 @@ Both scripts rely on the helper modules described below.
    ```bash
    python pipeline.py json_out/try.json
    ```
-   The script prints the reconstructed C source and the generated MLIR to the terminal. It also writes a dependency DAG to `output/ir_dag.*`.
+   The script prints the reconstructed C source and the generated MLIR to the terminal. It also writes a dependency DAG to `output/ir_dag.*`. Each node shows
+   the operation in SSA form (for example `%3 = %2 + %1`) and duplicate operands
+   result in multiple edges.
 
 ## Pipeline Overview
 

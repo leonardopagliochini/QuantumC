@@ -8,7 +8,7 @@ mlir_generator.py  - converts AST dataclasses into MLIR IR
 pipeline.py        - main entry point running the full pipeline
 mlir_pipeline.py   - re-exports core modules for convenience
 astJsonGen.py      - helper that invokes clang to produce JSON AST files
-dag_builder.py     - builds a DAG of IR dependencies
+dag_builder.py     - builds a DAG of IR dependencies using SSA-form labels
 ```
 
 The typical flow is:
