@@ -36,8 +36,6 @@ The compilation process performed by `pipeline.py` consists of four stages:
 3. **Write-in-Place Enforcement** – `quantum_translate.QuantumTranslator` analyzes the classical MLIR and rewrites it into the quantum dialect defined in `quantum_dialect.py` while enforcing write-in-place semantics.  Each integer variable becomes a quantum register, and arithmetic operations overwrite their left operand using versioned paths to avoid clobbering existing values.
 4. **Printing** – xDSL's `Printer` utility is used to display the generated modules.
 5. **Path Visualization** – `paths_dataframe.build_paths_dataframe` constructs a pandas DataFrame showing register usage which is stored on `QuantumIR.paths_df`. The table includes an `operation` column describing the computation performed at each timestep.
-6. **SSA DAG** – `ssa_dag.build_dag` creates a dependency graph of the write-in-place IR which can be exported or visualised.
-7. **Quantum Constraints** – `ssa_dag.enforce_constraints` rewrites the DAG so that every register follows quantum-friendly rules. `QuantumIR.run_enforce_quantum_constraints` exposes this step.
 
 Running the pipeline will therefore produce two MLIR modules: the direct lowering from C and a write-in-place version expressed with quantum-style operations.
 
@@ -87,6 +85,4 @@ Additional documentation describing each stage of the pipeline can be found unde
 - [Classical MLIR Generation](docs/classical_mlir_generation.md)
 - [Enforcing Write-In-Place](docs/enforce_write_in_place.md)
 - [Overall Pipeline Overview](docs/pipeline_overview.md)
-- [SSA DAG Construction](docs/ssa_dag.md)
-- [Quantum Constraint Enforcement](docs/quantum_constraints.md)
 

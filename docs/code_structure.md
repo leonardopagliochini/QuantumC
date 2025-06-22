@@ -9,7 +9,6 @@ quantum_dialect.py - defines the custom quantum dialect operations
 dialect_ops.py     - helper operations used during translation
 paths_dataframe.py - utilities building the register path DataFrame
 c_ast.py           - dataclass representation of the C-like AST
-ssa_dag.py         - build and transform the SSA dependency graph
 astJsonGen.py      - helper that invokes clang to produce JSON AST files
 generate_ast.py    - script that runs `astJsonGen` over `c_code`
 ```
@@ -20,6 +19,4 @@ The typical flow is:
 3. Generated MLIR is processed by `quantum_translate.py` to enforce write-in-place semantics using operations defined in `quantum_dialect.py` and
    `dialect_ops.py`.
 4. `paths_dataframe.py` records register usage and can be displayed via `QuantumIR.visualize_paths_dataframe`.
-5. `ssa_dag.py` builds a dependency graph which may be visualised or exported.
-6. `enforce_constraints` from `ssa_dag.py` rewrites the IR to satisfy quantum-specific rules.
 
