@@ -215,9 +215,22 @@ class QuantumIR:
             raise RuntimeError("Must call run_generate_ir first")
         dag = IRDependencyDAG(self.module)
         dag.build()
-        prefix = os.path.join(self.output_dir, "ir_dag")
+        prefix = os.path.join(self.output_dir, "classical_ir_dag")
         dag.export(prefix)
-        print(f"IR DAG written to {prefix}.png and {prefix}.xdot")
+        print(f"Classical IR DAG written to {prefix}.png and {prefix}.xdot")
+
+    def build_no_double_consume_dag(self) -> None:
+        """Create a DAG where duplicate operands are split."""
+        if self.module is None:
+            raise RuntimeError("Must call run_generate_ir first")
+        dag = IRDependencyDAG(self.module)
+        dag.build()
+        ndc = dag.duplicate_double_consumers()
+        prefix = os.path.join(self.output_dir, "no_double_consume_dag")
+        ndc.export(prefix)
+        print(
+            f"No-double-consume DAG written to {prefix}.png and {prefix}.xdot"
+        )
 
 
 
@@ -233,6 +246,7 @@ if __name__ == "__main__":
         pipeline.run_generate_ir()
         pipeline.visualize_ir()
         pipeline.build_ir_dag()
+        pipeline.build_no_double_consume_dag()
     except Exception as e:
         print("Error in the execution of the program:", e)
         raise

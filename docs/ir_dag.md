@@ -4,4 +4,4 @@
 
 If an operation reads the same value multiple times, parallel edges are emitted: two edges from producer to consumer.
 
-Running the CLI will automatically generate `output/ir_dag.png` and `output/ir_dag.xdot` after the MLIR is produced. They can be inspected with standard Graphviz tools.
+Running the CLI will automatically generate `output/classical_ir_dag.png` and `output/classical_ir_dag.xdot` after the MLIR is produced. A second graph named `output/no_double_consume_dag.*` shows the version where duplicated operands are split. Both can be inspected with standard Graphviz tools.

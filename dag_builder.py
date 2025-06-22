@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Dict
+import re
 
 from xdsl.ir import Operation, SSAValue
 from xdsl.dialects.builtin import ModuleOp
@@ -112,3 +113,82 @@ class IRDependencyDAG:
         dot.render(prefix, cleanup=True)
         dot.format = "xdot"
         dot.render(prefix, cleanup=False)
+
+    # ------------------------------------------------------------------
+    def clone(self) -> "IRDependencyDAG":
+        """Return a shallow copy of this DAG structure."""
+        other = IRDependencyDAG(self.module)
+        other.graph = self.graph.copy()
+        other.node_labels = self.node_labels.copy()
+        return other
+
+    # ------------------------------------------------------------------
+    def duplicate_double_consumers(self) -> "IRDependencyDAG":
+        """Return a new DAG where duplicated operands are split."""
+        dag = self.clone()
+        g = dag.graph
+        labels = dag.node_labels
+        counter = 0
+
+        for consumer in list(g.nodes):
+            first_line = labels[consumer].splitlines()[0]
+            tokens = re.findall(r"%\d+(?:['\"])?", first_line)
+            # looking for ops with two operands using the same register
+            if len(tokens) == 3 and tokens[1] == tokens[2]:
+                reg = tokens[1]
+
+                # find the producer emitting ``reg``
+                producer = None
+                for pred in g.predecessors(consumer):
+                    pred_line = labels[pred].splitlines()[0]
+                    result_name = pred_line.split("=")[0].strip()
+                    if result_name == reg:
+                        producer = pred
+                        break
+                if producer is None:
+                    continue
+
+                # create two copies of the producer
+                p1 = f"{producer}_dup{counter}a"
+                p2 = f"{producer}_dup{counter}b"
+                counter += 1
+
+                g.add_node(p1)
+                g.add_node(p2)
+
+                prod_label = labels[producer]
+                base_line, *rest_lines = prod_label.splitlines()
+                result_token = base_line.split("=")[0].strip()
+                base_ops = base_line[len(result_token) + 1 :].lstrip("=").strip()
+                labels[p1] = f"{result_token}' = {base_ops}"
+                labels[p2] = f"{result_token}\" = {base_ops}"
+                if rest_lines:
+                    labels[p1] += "\n" + "\n".join(rest_lines)
+                    labels[p2] += "\n" + "\n".join(rest_lines)
+
+                # connect original predecessors to the new copies
+                for u, _, k in list(g.in_edges(producer, keys=True)):
+                    g.add_edge(u, p1)
+                    g.add_edge(u, p2)
+
+                # remove edges from original producer to this consumer
+                while g.has_edge(producer, consumer):
+                    g.remove_edge(producer, consumer)
+
+                # add edges from the new nodes to consumer
+                g.add_edge(p1, consumer)
+                g.add_edge(p2, consumer)
+
+                # update consumer label with new operand names
+                cons_line, *cons_rest = labels[consumer].splitlines()
+                result_token_cons = cons_line.split("=")[0].strip()
+                ops = cons_line[len(result_token_cons) + 1 :].lstrip("=").strip()
+                op_tokens = re.findall(r"%\d+(?:['\"])?", ops)
+                if len(op_tokens) >= 2:
+                    ops = ops.replace(op_tokens[0], f"{reg}'", 1)
+                    ops = ops.replace(op_tokens[1], f"{reg}\"", 1)
+                labels[consumer] = f"{result_token_cons} = {ops}"
+                if cons_rest:
+                    labels[consumer] += "\n" + "\n".join(cons_rest)
+
+        return dag
