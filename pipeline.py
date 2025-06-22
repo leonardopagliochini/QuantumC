@@ -139,6 +139,8 @@ class QuantumIR:
         self.root: TranslationUnit | None = None
         # MLIR module for classic MLIR
         self.module: ModuleOp | None = None
+        # Cached DAG of the classical IR
+        self.ir_dag: IRDependencyDAG | None = None
 
         if not os.path.exists(self.json_path):
             raise FileNotFoundError(f"Input JSON file not found: {self.json_path}")
@@ -209,15 +211,26 @@ class QuantumIR:
         print("=" * 35)
         print()
 
-    def build_ir_dag(self) -> None:
+    def build_classical_ir_dag(self) -> None:
         """Construct and store the dependency DAG of the generated IR."""
         if self.module is None:
             raise RuntimeError("Must call run_generate_ir first")
         dag = IRDependencyDAG(self.module)
         dag.build()
-        prefix = os.path.join(self.output_dir, "ir_dag")
+        prefix = os.path.join(self.output_dir, "classical_ir_dag")
         dag.export(prefix)
-        print(f"IR DAG written to {prefix}.png and {prefix}.xdot")
+        self.ir_dag = dag
+        print(f"Classical IR DAG written to {prefix}.png and {prefix}.xdot")
+
+    def build_no_double_consume_dag(self) -> None:
+        """Generate a DAG where duplicated operands are produced by cloned nodes."""
+        if self.ir_dag is None:
+            self.build_classical_ir_dag()
+        assert self.ir_dag is not None
+        dag = self.ir_dag.duplicate_double_consumes()
+        prefix = os.path.join(self.output_dir, "no_double_consume_dag")
+        dag.export(prefix)
+        print(f"No-double-consume DAG written to {prefix}.png and {prefix}.xdot")
 
 
 
@@ -232,7 +245,8 @@ if __name__ == "__main__":
         pipeline.pretty_print_source()
         pipeline.run_generate_ir()
         pipeline.visualize_ir()
-        pipeline.build_ir_dag()
+        pipeline.build_classical_ir_dag()
+        pipeline.build_no_double_consume_dag()
     except Exception as e:
         print("Error in the execution of the program:", e)
         raise

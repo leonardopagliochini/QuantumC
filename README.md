@@ -25,18 +25,18 @@ Both scripts rely on the helper modules described below.
    ```bash
    python pipeline.py json_out/try.json
    ```
-   The script prints the reconstructed C source and the generated MLIR to the terminal. It also writes a dependency DAG to `output/ir_dag.*`. Each node shows
-   the operation in SSA form (for example `%3 = %2 + %1`) and duplicate operands
-   result in multiple edges.
+   The script prints the reconstructed C source and the generated MLIR to the terminal. It also writes two dependency graphs: `output/classical_ir_dag.*` mirrors the MLIR as-is, while `output/no_double_consume_dag.*` duplicates producers when a value is consumed twice by the same operation. Each node shows
+   the operation in SSA form (for example `%3 = %2 + %1`).
 
 ## Pipeline Overview
 
-The compilation process performed by `pipeline.py` consists of four stages:
+The compilation process performed by `pipeline.py` consists of five stages:
 
 1. **JSON Parsing** – `c_ast.parse_ast` converts the Clang generated JSON AST into a hierarchy of lightweight dataclasses such as `FunctionDecl`, `VarDecl`, and `BinaryOperator`.
 2. **MLIR Generation** – `mlir_generator.MLIRGenerator` walks those dataclasses and emits standard MLIR using the xDSL API.  Operations with constant immediates make use of custom ops defined in `dialect_ops.py`.
 3. **Printing** – xDSL's `Printer` utility is used to display the generated modules.
-4. **DAG Extraction** – `dag_builder.py` writes a graph of dependencies between the MLIR operations.
+4. **DAG Extraction** – `QuantumIR.build_classical_ir_dag` writes a graph of dependencies between the MLIR operations.
+5. **No Double Consume DAG** – `QuantumIR.build_no_double_consume_dag` duplicates producers when a consumer uses the same value twice.
 
 
 ## Project Structure
@@ -74,4 +74,5 @@ Additional documentation describing each stage of the pipeline can be found unde
 - [Classical MLIR Generation](docs/classical_mlir_generation.md)
 - [Overall Pipeline Overview](docs/pipeline_overview.md)
 - [IR Dependency DAG](docs/ir_dag.md)
+- [No Double Consume DAG](docs/no_double_consume_dag.md)
 
