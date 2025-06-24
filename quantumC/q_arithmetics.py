@@ -3,7 +3,7 @@ from qiskit.circuit.library import QFT
 import numpy as np
 from qiskit_aer import AerSimulator
 
-NUMBER_OF_BITS = 10
+NUMBER_OF_BITS = 4
 
 
 def int_to_twos_complement(value):
@@ -265,6 +265,8 @@ def simulate(qc, shots=1024):
             signed = unsigned
 
         print(f"Register {reg.name}: binary = {reg_bits}, value (2's complement) = {signed}")
+
+    return signed
 
 
 
