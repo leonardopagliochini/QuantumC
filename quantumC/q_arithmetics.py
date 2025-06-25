@@ -177,44 +177,6 @@ def subi(qc, qreg, b):
     return addi(qc, qreg, -b)
 
 
-def mul(qc, a_reg, b_reg):
-    """
-    Multiply two quantum registers using a shift-and-add quantum circuit.
-
-    Args:
-        qc (QuantumCircuit): The quantum circuit to modify.
-        a_reg (QuantumRegister): The multiplicand register.
-        b_reg (QuantumRegister): The multiplier register.
-
-    Returns:
-        QuantumRegister: The result register containing the product.
-    """
-    result_size = 2 * NUMBER_OF_BITS
-    result_reg = QuantumRegister(result_size, name="product")
-    qc.add_register(result_reg)
-
-    for i in range(NUMBER_OF_BITS):
-        # Create a temporary shifted version of a_reg mapped to result_reg[i:i+N]
-        shifted_a_indices = list(range(i, i + NUMBER_OF_BITS))
-        if max(shifted_a_indices) >= result_size:
-            continue  # Skip if out of bounds
-
-        # Temporary QFT on target slice of result_reg
-        target_slice = [result_reg[j] for j in shifted_a_indices]
-        qc.append(QFT(NUMBER_OF_BITS, do_swaps=False), target_slice)
-
-        for m in range(NUMBER_OF_BITS):
-            for n in range(NUMBER_OF_BITS):
-                if n <= m:
-                    angle = (2 * np.pi) / (2 ** (m - n + 1))
-                    qc.cp(angle, b_reg[i], result_reg[i + m])  # Controlled on b[i]
-
-        qc.append(QFT(NUMBER_OF_BITS, do_swaps=False).inverse(), target_slice)
-
-    return result_reg
-
-
-
 def measure(qc, qreg):
     """
     Measure a quantum register and store the result in a classical register.
