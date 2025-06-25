@@ -244,6 +244,8 @@ class QuantumTranslator:
             opcode, lhs, rhs = expr[1]
             q_lhs = self.emit_value(lhs)
             q_rhs = self.emit_value(rhs)
+            if q_lhs is q_rhs:
+                q_rhs = self.duplicate_value(rhs)
 
             # Allocate a fresh register for the result rather than updating one
             # of the operands in place.
@@ -279,6 +281,49 @@ class QuantumTranslator:
 
         else:
             raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    def duplicate_value(self, val: SSAValue) -> SSAValue:
+        """Return a fresh register with the same value as ``val``."""
+
+        info = self.val_info[val]
+        expr = info.expr
+
+        if expr[0] == "const":
+            reg = self.allocate_reg()
+            op = QuantumInitOp(expr[1])
+            self.current_block.add_op(op)
+            op.results[0].name_hint = f"q{reg}_0"
+            self.reg_version[reg] = 0
+            self.reg_ssa[reg] = op.results[0]
+            return op.results[0]
+
+        if expr[0] == "binary":
+            opcode, lhs, rhs = expr[1]
+            q_lhs = self.emit_value(lhs)
+            q_rhs = self.emit_value(rhs)
+            if q_lhs is q_rhs:
+                q_rhs = self.duplicate_value(rhs)
+            reg = self.allocate_reg()
+            op = self.create_binary_op(opcode, q_lhs, q_rhs)
+            self.current_block.add_op(op)
+            op.results[0].name_hint = f"q{reg}_0"
+            self.reg_version[reg] = 0
+            self.reg_ssa[reg] = op.results[0]
+            return op.results[0]
+
+        if expr[0] == "binaryimm":
+            opcode, lhs, imm = expr[1]
+            q_lhs = self.emit_value(lhs)
+            reg = self.allocate_reg()
+            op = self.create_binary_imm_op(opcode, q_lhs, imm)
+            self.current_block.add_op(op)
+            op.results[0].name_hint = f"q{reg}_0"
+            self.reg_version[reg] = 0
+            self.reg_ssa[reg] = op.results[0]
+            return op.results[0]
+
+        raise NotImplementedError
 
     # ------------------------------------------------------------------
     def create_binary_op(self, opcode: str, lhs: SSAValue, rhs: SSAValue) -> Operation:
@@ -355,6 +400,8 @@ class QuantumTranslator:
                 # Materialize operand values.
                 q_lhs = self.emit_value(lhs)
                 q_rhs = self.emit_value(rhs)
+                if q_lhs is q_rhs:
+                    q_rhs = self.duplicate_value(rhs)
 
                 # Determine opcode string.
                 opcode = {
