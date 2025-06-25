@@ -3,8 +3,9 @@
 This module provides ``QuantumTranslator`` which walks over a module
 containing standard arithmetic operations and produces an equivalent
 module using the custom quantum dialect defined in ``quantum_dialect``.
-The translation keeps track of quantum registers, recreating values
-when necessary and attempting to reuse registers when possible.
+Operations are translated so that results are written to fresh quantum
+registers.  Registers are never copied; if a value gets overwritten the
+translator can recompute it from the stored expression description.
 """
 
 from __future__ import annotations
@@ -223,73 +224,58 @@ class QuantumTranslator:
         if expr[0] == "const":
             # The value was produced by a constant operation.
             value = expr[1]
-            reg = info.reg
-            version = self.reg_version[reg] + 1
 
-            # Allocate a fresh register so that we do not overwrite the
-            # previous value. Quantum registers cannot be reset in place without
-            # destroying information.
+            # Allocate a new register for the constant value.
             reg = self.allocate_reg()
-
-            # Emit the initialization of the new register with the constant
-            # value.
             op = QuantumInitOp(value)
             self.current_block.add_op(op)
 
-            # Track the new version and SSA value for the register.
-            op.results[0].name_hint = f"q{reg}_{version}"
-            self.reg_version[reg] = version
+            # Track the register storing the constant.
+            op.results[0].name_hint = f"q{reg}_0"
+            self.reg_version[reg] = 0
             self.reg_ssa[reg] = op.results[0]
 
-            # Update the stored ``ValueInfo`` so future uses know where the
-            # value lives.
-            info.version = version
+            # Update ``ValueInfo`` to point at the new register.
+            info.version = 0
             info.reg = reg
 
         elif expr[0] == "binary":
             # ``val`` was produced by a binary operation with two operands.
-            opcode, lhs, rhs, target = expr[1]
+            opcode, lhs, rhs = expr[1]
             q_lhs = self.emit_value(lhs)
             q_rhs = self.emit_value(rhs)
 
-            # Determine which register will hold the result.  If ``target`` is
-            # ``rhs`` we swap the operands because the operation will update the
-            # register corresponding to ``rhs``.
-            if target is rhs:
-                first = q_rhs
-                second = q_lhs
-                reg = self.val_info[rhs].reg
-            else:
-                first = q_lhs
-                second = q_rhs
-                reg = self.val_info[lhs].reg
+            # Allocate a fresh register for the result rather than updating one
+            # of the operands in place.
+            reg = self.allocate_reg()
 
-            # Emit the appropriate quantum binary operation.
-            op = self.create_binary_op(opcode, first, second)
+            # Emit the quantum binary operation producing the new register.
+            op = self.create_binary_op(opcode, q_lhs, q_rhs)
             self.current_block.add_op(op)
 
-            # Update bookkeeping for the target register.
-            version = self.reg_version[reg] + 1
-            op.results[0].name_hint = f"q{reg}_{version}"
-            self.reg_version[reg] = version
+            # Track the new register and its SSA value.
+            op.results[0].name_hint = f"q{reg}_0"
+            self.reg_version[reg] = 0
             self.reg_ssa[reg] = op.results[0]
-            info.version = version
+            info.version = 0
+            info.reg = reg
 
         elif expr[0] == "binaryimm":
             # ``val`` came from a binary operation with an immediate operand.
             opcode, lhs, imm = expr[1]
             q_lhs = self.emit_value(lhs)
-            reg = self.val_info[lhs].reg
+
+            # Allocate a new register for the result.
+            reg = self.allocate_reg()
             op = self.create_binary_imm_op(opcode, q_lhs, imm)
             self.current_block.add_op(op)
 
-            # As above, bump the register version and remember the result SSA
-            # value.
-            version = self.reg_version[reg] + 1
-            op.results[0].name_hint = f"q{reg}_{version}"
-            self.reg_version[reg] = version
+            # Track the newly allocated register.
+            op.results[0].name_hint = f"q{reg}_0"
+            self.reg_version[reg] = 0
             self.reg_ssa[reg] = op.results[0]
-            info.version = version
+            info.version = 0
+            info.reg = reg
 
         else:
             raise NotImplementedError
@@ -362,18 +348,15 @@ class QuantumTranslator:
                 # Binary arithmetic operation with two SSA operands.
                 lhs, rhs = op.operands
 
-                # Compute remaining use counts for operands after this
-                # operation executes.
-                left_count = remaining[lhs] - 1
-                right_count = remaining[rhs] - 1
+                # Update use counts for the operands.
                 remaining[lhs] -= 1
                 remaining[rhs] -= 1
 
-                # Materialize the current values of the operands.
+                # Materialize operand values.
                 q_lhs = self.emit_value(lhs)
                 q_rhs = self.emit_value(rhs)
 
-                # Determine the opcode string for convenience.
+                # Determine opcode string.
                 opcode = {
                     AddiOp: "add",
                     SubiOp: "sub",
@@ -381,33 +364,15 @@ class QuantumTranslator:
                     DivSIOp: "div",
                 }[type(op)]
 
-                # ``add`` and ``mul`` are commutative.  When possible we update
-                # the operand that will not be used again to avoid allocating a
-                # new register.
-                comm = opcode in ("add", "mul")
-                if comm:
-                    if left_count > 0 and right_count == 0:
-                        first, second, target = q_rhs, q_lhs, rhs
-                    elif right_count > 0 and left_count == 0:
-                        first, second, target = q_lhs, q_rhs, lhs
-                    else:
-                        if self.compute_cost(lhs) <= self.compute_cost(rhs):
-                            first, second, target = q_lhs, q_rhs, lhs
-                        else:
-                            first, second, target = q_rhs, q_lhs, rhs
-                else:
-                    first, second, target = q_lhs, q_rhs, lhs
-
-                # Emit the quantum binary operation and update bookkeeping for
-                # the target register.
-                new_op = self.create_binary_op(opcode, first, second)
+                # Allocate a new register for the result and emit the op.
+                reg = self.allocate_reg()
+                new_op = self.create_binary_op(opcode, q_lhs, q_rhs)
                 self.current_block.add_op(new_op)
-                reg = self.val_info[target].reg
-                version = self.reg_version[reg] + 1
-                new_op.results[0].name_hint = f"q{reg}_{version}"
-                self.reg_version[reg] = version
+
+                # Record the new register.
+                new_op.results[0].name_hint = f"q{reg}_0"
                 self.reg_ssa[reg] = new_op.results[0]
-                self.val_info[op.results[0]] = ValueInfo(reg, version, ("binary", (opcode, lhs, rhs, target)))
+                self.val_info[op.results[0]] = ValueInfo(reg, 0, ("binary", (opcode, lhs, rhs)))
 
             elif op.name in ("iarith.addi_imm", "iarith.subi_imm", "iarith.muli_imm", "iarith.divsi_imm"):
                 # Binary operation where one operand is an immediate integer.
@@ -421,14 +386,15 @@ class QuantumTranslator:
                     "iarith.muli_imm": "mul",
                     "iarith.divsi_imm": "div",
                 }[op.name]
+
+                # Allocate a new register for the result.
+                reg = self.allocate_reg()
                 new_op = self.create_binary_imm_op(opcode, q_lhs, imm)
                 self.current_block.add_op(new_op)
-                reg = self.val_info[lhs].reg
-                version = self.reg_version[reg] + 1
-                new_op.results[0].name_hint = f"q{reg}_{version}"
-                self.reg_version[reg] = version
+
+                new_op.results[0].name_hint = f"q{reg}_0"
                 self.reg_ssa[reg] = new_op.results[0]
-                self.val_info[op.results[0]] = ValueInfo(reg, version, ("binaryimm", (opcode, lhs, imm)))
+                self.val_info[op.results[0]] = ValueInfo(reg, 0, ("binaryimm", (opcode, lhs, imm)))
 
             elif isinstance(op, ReturnOp):
                 # Return statements are forwarded directly after materializing
