@@ -1,0 +1,531 @@
+from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
+from qiskit.circuit.library.standard_gates import PhaseGate
+from qiskit.circuit.library import QFT, RGQFTMultiplier
+import numpy as np
+from qiskit_aer import AerSimulator  
+
+NUMBER_OF_BITS = 4
+
+def set_number_of_bits(n):
+    """
+    Set the number of bits for two's complement representation.
+    This function should be called before any other operations.
+    
+    Args:
+        n (int): The number of bits to use for two's complement representation.
+    """
+    global NUMBER_OF_BITS
+    if n <= 0:
+        raise ValueError("Number of bits must be a positive integer.")
+    NUMBER_OF_BITS = n
+
+
+def int_to_twos_complement(value):
+    """
+    Convert an integer to its two's complement binary representation.
+    Returns a list of bits (0 or 1), least significant bit first.
+    """
+    if value < 0:
+        value = (1 << NUMBER_OF_BITS) + value
+    return [(value >> i) & 1 for i in range(NUMBER_OF_BITS)]
+
+def initialize_variable(qc, value, register_name=None):
+    """
+    Initialize a new quantum register with a classical integer value.
+    If no name is given, generate a unique one.
+
+    Args:
+        qc (QuantumCircuit): The quantum circuit to modify.
+        value (int): The integer value to initialize the register with.
+        register_name (str, optional): The name of the quantum register. If None, a unique name will be generated.
+
+    Returns:
+        QuantumRegister: The newly created and initialized register.
+
+    Raises:
+        ValueError: If the value is outside the allowed two's complement range.
+    """
+    MIN_VAL = -2**(NUMBER_OF_BITS - 1)
+    MAX_VAL = 2**(NUMBER_OF_BITS - 1) - 1
+
+    if value < MIN_VAL or value > MAX_VAL:
+        raise ValueError(
+            f"Value {value} is out of range for two's complement representation "
+            f"with {NUMBER_OF_BITS} bits: [{MIN_VAL}, {MAX_VAL}]"
+        )
+
+    if register_name is None:
+        base_name = "qr"
+        index = 0
+        existing_names = {reg.name for reg in qc.qregs}
+        while f"{base_name}{index}" in existing_names:
+            index += 1
+        register_name = f"{base_name}{index}"
+
+    new_qreg = QuantumRegister(NUMBER_OF_BITS, name=register_name)
+    qc.add_register(new_qreg)
+
+    binary_value = int_to_twos_complement(value)
+
+    for i, bit in enumerate(binary_value):
+        if bit == 1:
+            qc.x(new_qreg[i])
+
+    return new_qreg
+
+def add_in_place(qc, a_reg, b_reg):
+    """
+    Add two quantum registers using a quantum circuit.
+
+    Args:
+        qc (QuantumCircuit): The quantum circuit to modify.
+        a_reg (QuantumRegister): The first quantum register.
+        b_reg (QuantumRegister): The second quantum register.
+    
+    Returns:
+        QuantumRegister: The quantum register containing the result of the addition.
+    """
+
+    # Apply QFT to a
+    qc.append(QFT(NUMBER_OF_BITS, do_swaps=False), a_reg)
+
+    # Add b into a using controlled phase gates
+    for i in range(NUMBER_OF_BITS):
+        for j in range(NUMBER_OF_BITS):
+            if j <= i:
+                angle = (2 * np.pi) / (2 ** (i - j + 1))
+                qc.cp(angle, b_reg[j], a_reg[i])
+
+    # Apply inverse QFT
+    qc.append(QFT(NUMBER_OF_BITS, do_swaps=False).inverse(), a_reg)
+    return a_reg
+
+def add(qc, a_reg, b_reg):
+    n = len(a_reg)
+
+    # Generate a unique name
+    existing_names = {reg.name for reg in qc.qregs}
+    index = 0
+    while f"sum{index}" in existing_names:
+        index += 1
+    sum_name = f"sum{index}"
+
+    s_reg = QuantumRegister(n, name=sum_name)
+    qc.add_register(s_reg)
+
+    # Apply QFT to s_reg (output register)
+    qc.append(QFT(n, do_swaps=False), s_reg)
+
+    # Apply controlled phase gates from a_reg and b_reg into s_reg
+    for i in range(n):
+        for j in range(n):
+            if j <= i:
+                angle = 2 * np.pi / (2 ** (i - j + 1))
+                qc.cp(angle, a_reg[j], s_reg[i])
+                qc.cp(angle, b_reg[j], s_reg[i])
+
+    # Inverse QFT
+    qc.append(QFT(n, do_swaps=False).inverse(), s_reg)
+
+    return s_reg
+
+
+
+def addi_in_place(qc, qreg, b):
+    """
+    Add a classical integer to a quantum register using a quantum circuit.
+
+    Args:
+        qc (QuantumCircuit): The quantum circuit to modify.
+        a_reg (QuantumRegister): The quantum register.
+        b (int): The classical integer to add.
+    
+    Returns:
+        QuantumRegister: The quantum register containing the result of the addition.
+    """
+    b_bin = int_to_twos_complement(b)
+    qc.append(QFT(num_qubits=NUMBER_OF_BITS, do_swaps=False), qreg)
+
+    # Add classical value b (2's complement) via controlled phase rotations
+    b_int = int(''.join(str(x) for x in b_bin[::-1]), 2)
+    if b >= 0:
+        b_val = b_int
+    else:
+        b_val = b_int - (1 << NUMBER_OF_BITS) 
+
+    for j in range(NUMBER_OF_BITS):
+        angle = (b_val * 2 * np.pi) / (2 ** (j + 1))
+        qc.p(angle, qreg[j])
+
+    # Apply inverse QFT
+    qc.append(QFT(num_qubits=NUMBER_OF_BITS, do_swaps=False).inverse(), qreg)
+    return qreg
+
+def invert(qc, qreg):
+    """
+    Invert the sign of a value in two's complement stored in a quantum register:
+    apply bitwise NOT and add 1.
+
+    Args:
+        qc (QuantumCircuit): The quantum circuit to modify.
+        qreg (QuantumRegister): The quantum register to negate.
+
+    Returns:
+        QuantumRegister: The modified quantum register (now contains -x).
+    """
+    # Step 1: Bitwise NOT (apply X to every qubit)
+    for qubit in qreg:
+        qc.x(qubit)
+
+    # Step 2: Add 1 using addi()
+    addi_in_place(qc, qreg, 1)
+
+    return qreg
+
+def addi(qc, a_reg, b):
+    """
+    Add a classical integer b to a quantum register a_reg,
+    storing the result in a new quantum register (non-in-place).
+    Leaves a_reg unchanged. Supports two's complement.
+
+    Args:
+        qc (QuantumCircuit): The quantum circuit to modify.
+        a_reg (QuantumRegister): The quantum register to which b will be added.
+        b (int): The classical integer to add.
+
+    Returns:
+        QuantumRegister: A new quantum register containing the result (a + b).
+    """
+    n = len(a_reg)
+    s_reg = QuantumRegister(n, name='sum')
+    qc.add_register(s_reg)
+
+    # Apply QFT to s_reg (output register)
+    qc.append(QFT(n, do_swaps=False), s_reg)
+
+    # Add classical value b via phase rotations to s_reg
+    b_bin = int_to_twos_complement(b)
+    b_int = int(''.join(str(x) for x in b_bin[::-1]), 2)
+    b_val = b_int if b >= 0 else b_int - (1 << n)
+
+    for j in range(n):
+        angle = (b_val * 2 * np.pi) / (2 ** (j + 1))
+        qc.p(angle, s_reg[j])
+
+    # Add a_reg to s_reg via controlled rotations
+    for i in range(n):
+        for j in range(n):
+            if j <= i:
+                angle = 2 * np.pi / (2 ** (i - j + 1))
+                qc.cp(angle, a_reg[j], s_reg[i])
+
+    # Inverse QFT
+    qc.append(QFT(n, do_swaps=False).inverse(), s_reg)
+
+    return s_reg
+
+
+
+def sub(qc, a_reg, b_reg):
+    """
+    Subtract the contents of b_reg from a_reg using two's complement:
+    a - b = a + (-b)
+
+    Args:
+        qc (QuantumCircuit): The quantum circuit to modify.
+        a_reg (QuantumRegister): The minuend register (a).
+        b_reg (QuantumRegister): The subtrahend register (b).
+    
+    Returns:
+        QuantumRegister: The register containing the result (in a_reg).
+    """
+    # Invert the sign of b (i.e., compute -b)
+    invert(qc, b_reg)
+
+    # Add -b to a
+    result = add(qc, a_reg, b_reg)
+
+    # Invert the sign of b back to its original value
+    invert(qc, b_reg)
+    return result
+
+def subi(qc, qreg, b):
+    """
+    Subtract a classical integer from a quantum register using two's complement:
+    a - b = a + (-b)
+
+    Args:
+        qc (QuantumCircuit): The quantum circuit to modify.
+        qreg (QuantumRegister): The quantum register to subtract from.
+        b (int): The classical integer to subtract.
+    
+    Returns:
+        QuantumRegister: The quantum register containing the result.
+    """
+    return addi(qc, qreg, -b)
+
+def mul(qc, a_reg, b_reg, a_val=None, b_val=None):
+    """
+    Multiply two quantum registers using QFT-based logic.
+    Result is stored in an n-bit register (i.e. modulo 2^n).
+
+    Args:
+        qc (QuantumCircuit): The quantum circuit to modify.
+        a_reg (QuantumRegister): First multiplicand (n qubits).
+        b_reg (QuantumRegister): Second multiplicand (n qubits).
+        a_val (int): Optional known classical value of a (for sign correction).
+        b_val (int): Optional known classical value of b.
+
+    Returns:
+        QuantumRegister: New n-bit register with the product modulo 2^n.
+    """
+    n = len(a_reg)
+    out_reg = QuantumRegister(n, name="prod")
+    qc.add_register(out_reg)
+
+    # QFT on output
+    qc.append(QFT(n, do_swaps=False), out_reg)
+
+    # Controlled-controlled-phase rotations (truncated to n-bit result)
+    for j in range(1, n + 1):
+        for i in range(1, n + 1):
+            for k in range(1, n + 1):  # ⬅️ Only n bits in the result
+                lam = (2 * np.pi) / (2 ** (i + j + k - 2 * n))
+                if lam != 0:
+                    qc.append(PhaseGate(lam).control(2), [a_reg[n - j], b_reg[n - i], out_reg[k - 1]])
+
+    # Inverse QFT
+    qc.append(QFT(n, do_swaps=False).inverse(), out_reg)
+
+    # Sign correction (if signs are known)
+    if a_val is not None and b_val is not None:
+        if (a_val < 0) ^ (b_val < 0):  # segni opposti
+            invert(qc, out_reg)
+
+    return out_reg
+
+def muli(qc, a_reg, c, n_output_bits=None):
+    """
+    Multiply a quantum register by a classical constant c (can be negative).
+    Stores result in a new register of size n_output_bits (default: len(a_reg)).
+
+    Args:
+        qc (QuantumCircuit): Circuit to modify.
+        a_reg (QuantumRegister): Input register.
+        c (int): Classical multiplier.
+        n_output_bits (int): Number of bits in output (default = len(a_reg)).
+
+    Returns:
+        QuantumRegister: Output register with result (two's complement if needed).
+    """
+    n = len(a_reg)
+    if n_output_bits is None:
+        n_output_bits = n
+
+    out_reg = QuantumRegister(n_output_bits, name="prod")
+    qc.add_register(out_reg)
+
+    # QFT
+    qc.append(QFT(n_output_bits, do_swaps=False), out_reg)
+
+    # Phase logic
+    abs_c = abs(c)
+    for j in range(n):
+        for k in range(n_output_bits):
+            angle = (2 * np.pi * abs_c * (2 ** j)) / (2 ** (k + 1))
+            angle = angle % (2 * np.pi)
+            if angle != 0:
+                qc.cp(angle, a_reg[j], out_reg[k])
+
+    # Inverse QFT
+    qc.append(QFT(n_output_bits, do_swaps=False).inverse(), out_reg)
+
+    # Sign correction
+    if c < 0:
+        invert(qc, out_reg)
+
+    return out_reg
+
+def divi(qc, a_reg, b):
+    """
+    Integer division of a quantum register by classical constant b.
+    Fixes bug where result was always zero due to short output register.
+
+    Args:
+        qc (QuantumCircuit): Circuit.
+        a_reg (QuantumRegister): Input register.
+        b (int): Classical constant divisor (≠ 0).
+
+    Returns:
+        QuantumRegister: Quotient register.
+    """
+    if b == 0:
+        raise ValueError("Division by zero.")
+
+    n = len(a_reg)
+    b_abs = abs(b)
+
+    m = (1 << n) // b_abs
+
+    # Multiply using 2n-bit output
+    tmp = muli(qc, a_reg, m, n_output_bits=2 * n)
+
+    q_reg = QuantumRegister(n, name="quot")
+    qc.add_register(q_reg)
+    for i in range(n):
+        qc.cx(tmp[i + n], q_reg[i])
+
+    if b < 0:
+        invert(qc, q_reg)
+
+    return q_reg
+
+# def div(qc, a_reg, b_reg, a_val=None, b_val=None):
+#     """
+#     Integer division: a / b where both a and b are quantum registers.
+#     Implements a restoring division algorithm using QFT-based arithmetic.
+    
+#     Args:
+#         qc (QuantumCircuit): Circuit to modify.
+#         a_reg (QuantumRegister): Dividend register (n qubits).
+#         b_reg (QuantumRegister): Divisor register (n qubits).
+#         a_val (int, optional): Classical value of a (for sign correction).
+#         b_val (int, optional): Classical value of b (for sign correction).
+    
+#     Returns:
+#         QuantumRegister: Quotient register.
+#     """
+#     n = len(a_reg)
+    
+#     # Registers
+#     r_reg = QuantumRegister(n, name='rem')     # remainder
+#     q_reg = QuantumRegister(n, name='quot')    # quotient
+#     tmp_reg = QuantumRegister(n, name='tmp')   # temp for subtraction
+#     qc.add_register(r_reg, q_reg, tmp_reg)
+
+#     # Initialize R to 0, Q to a
+#     for i in range(n):
+#         qc.cx(a_reg[i], q_reg[i])  # Q = A
+
+#     # Repeat n times
+#     for step in range(n):
+#         # Shift left (R,Q)
+#         for i in reversed(range(1, n)):
+#             qc.cx(q_reg[i - 1], q_reg[i])
+#             qc.cx(r_reg[i - 1], r_reg[i])
+#         qc.cx(q_reg[n - 1], r_reg[0])  # MSB of Q into LSB of R
+
+#         # Save a copy of R into tmp for possible restoration
+#         for i in range(n):
+#             qc.cx(r_reg[i], tmp_reg[i])
+
+#         # R = R - B
+#         invert(qc, b_reg)
+#         r_minus_b = add(qc, r_reg, b_reg)
+#         invert(qc, b_reg)  # Restore B
+
+#         # Check sign bit
+#         sign_bit = r_minus_b[n - 1]
+
+#         # If negative, restore R from tmp and set Q[0] = 0
+#         # Else, keep new R and set Q[0] = 1
+#         for i in range(n):
+#             qc.cx(sign_bit, tmp_reg[i])
+#             qc.ccx(sign_bit, tmp_reg[i], r_reg[i])
+
+#         qc.x(q_reg[0])  # Flip for conditional set
+#         qc.cx(sign_bit, q_reg[0])
+#         qc.x(q_reg[0])
+
+#     # Sign correction
+#     if a_val is not None and b_val is not None:
+#         if (a_val < 0) ^ (b_val < 0):
+#             invert(qc, q_reg)
+
+#     return q_reg
+
+# def shift_left_rq(qc, r_reg, q_reg):
+#     """
+#     Perform a logical left shift on the concatenated (R, Q) registers.
+#     Args:
+#         qc (QuantumCircuit): Circuit to modify.
+#         r_reg (QuantumRegister): Remainder register.
+#         q_reg (QuantumRegister): Quotient register.
+#     """
+#     n = len(r_reg)
+
+#     # Shift R bits to the left
+#     for i in reversed(range(1, n)):
+#         qc.cx(r_reg[i - 1], r_reg[i])
+#         qc.reset(r_reg[i - 1])  # zero after moving
+
+#     # MSB of Q becomes new LSB of R
+#     qc.cx(q_reg[n - 1], r_reg[0])
+#     qc.reset(q_reg[n - 1])  # clear after use
+
+#     # Shift Q bits to the left
+#     for i in reversed(range(1, n)):
+#         qc.cx(q_reg[i - 1], q_reg[i])
+#         qc.reset(q_reg[i - 1])  # zero after moving
+
+#     # Set LSB of Q to 0
+#     # (already reset)
+
+
+def measure(qc, qreg):
+    """
+    Measure a quantum register and store the result in a classical register.
+
+    Args:
+        qc (QuantumCircuit): The quantum circuit to modify.
+        qreg (QuantumRegister): The quantum register to measure.
+    """
+    c_reg = ClassicalRegister(len(qreg), name=qreg.name+'_measure')
+    qc.add_register(c_reg)
+    qc.measure(qreg, c_reg)
+
+def simulate(qc, shots=1024):
+    """
+    Simulate the quantum circuit and print the interpreted two's complement value
+    for each measured quantum register.
+
+    Args:
+        qc (QuantumCircuit): The quantum circuit to simulate.
+        shots (int): The number of shots for the simulation.
+    """
+    backend = AerSimulator(method='matrix_product_state')
+    transpiled = transpile(qc, backend)
+    job = backend.run(transpiled, shots=shots)
+    counts = job.result().get_counts()
+
+    # Get most frequent measurement result
+    most_common = max(counts, key=counts.get)
+    bitstring = most_common.replace(' ', '')  # Qiskit returns MSB leftmost
+
+    print(f"Measured bitstring: {bitstring}")
+
+    offset = 0
+    for reg in reversed(qc.qregs):  # Reverse: Qiskit stacks qubits from last to first
+        reg_size = len(reg)
+        reg_bits = bitstring[offset:offset + reg_size]
+        offset += reg_size
+
+        if len(reg_bits) < reg_size:
+            print(f"Register {reg.name}: not fully measured or missing.")
+            continue
+
+        # Interpret as two's complement
+        unsigned = int(reg_bits, 2)
+        if reg_bits[0] == '1':
+            signed = unsigned - (1 << reg_size)
+        else:
+            signed = unsigned
+
+        print(f"Register {reg.name}: binary = {reg_bits}, value (2's complement) = {signed}")
+
+    return signed
+
+
+
+
+
