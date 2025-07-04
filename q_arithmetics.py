@@ -2,7 +2,10 @@ from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
 from qiskit.circuit.library.standard_gates import PhaseGate
 from qiskit.circuit.library import QFT, RGQFTMultiplier
 import numpy as np
-from qiskit_aer import AerSimulator  
+try:
+    from qiskit_aer import AerSimulator
+except Exception:  # pragma: no cover - optional dependency
+    AerSimulator = None
 
 NUMBER_OF_BITS = 4
 
@@ -197,7 +200,11 @@ def addi(qc, a_reg, b):
         QuantumRegister: A new quantum register containing the result (a + b).
     """
     n = len(a_reg)
-    s_reg = QuantumRegister(n, name='sum')
+    existing = {reg.name for reg in qc.qregs}
+    idx = 0
+    while f"sum{idx}" in existing:
+        idx += 1
+    s_reg = QuantumRegister(n, name=f"sum{idx}")
     qc.add_register(s_reg)
 
     # Apply QFT to s_reg (output register)
@@ -280,7 +287,11 @@ def mul(qc, a_reg, b_reg, a_val=None, b_val=None):
         QuantumRegister: New n-bit register with the product modulo 2^n.
     """
     n = len(a_reg)
-    out_reg = QuantumRegister(n, name="prod")
+    existing = {reg.name for reg in qc.qregs}
+    idx = 0
+    while f"prod{idx}" in existing:
+        idx += 1
+    out_reg = QuantumRegister(n, name=f"prod{idx}")
     qc.add_register(out_reg)
 
     # QFT on output
@@ -322,7 +333,11 @@ def muli(qc, a_reg, c, n_output_bits=None):
     if n_output_bits is None:
         n_output_bits = n
 
-    out_reg = QuantumRegister(n_output_bits, name="prod")
+    existing = {reg.name for reg in qc.qregs}
+    idx = 0
+    while f"prod{idx}" in existing:
+        idx += 1
+    out_reg = QuantumRegister(n_output_bits, name=f"prod{idx}")
     qc.add_register(out_reg)
 
     # QFT
