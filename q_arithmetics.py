@@ -1,6 +1,9 @@
+"""Utility functions implementing arithmetic and comparison on quantum data."""
+
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
 from qiskit.circuit.library.standard_gates import PhaseGate
 from qiskit.circuit.library import QFT, RGQFTMultiplier
+from qiskit.providers.basic_provider import BasicSimulator
 import numpy as np
 try:
     from qiskit_aer import AerSimulator
@@ -396,6 +399,8 @@ def divi(qc, a_reg, b):
     return q_reg
 
 def equal(qc, a_reg, b_reg):
+    """Return a qubit set to ``|1>`` if ``a_reg == b_reg``."""
+
     n = len(a_reg)
     assert len(b_reg) == n
 
@@ -407,9 +412,15 @@ def equal(qc, a_reg, b_reg):
 
     out = QuantumRegister(1, name="eq")
     qc.add_register(out)
+
+    # out = 1 if all xor_reg bits are 0
+    for qubit in xor_reg:
+        qc.x(qubit)
     qc.x(out[0])
-    for i in range(n):
-        qc.cx(xor_reg[i], out[0])
+    qc.mcx(xor_reg, out[0])
+    qc.x(out[0])
+    for qubit in xor_reg:
+        qc.x(qubit)
     return out[0]
 
 
@@ -448,31 +459,9 @@ def less_than(qc, a_reg, b_reg):
     return out[0]
 
 def greater_than(qc, a_reg, b_reg):
-    """
-    Compares a > b (signed) and stores the result in a single qubit.
-    """
-    n = len(a_reg)
-    assert len(b_reg) == n
+    """Return a qubit set to ``|1>`` if ``a_reg`` is strictly greater than ``b_reg``."""
 
-    tmp_b = QuantumRegister(n, name='bneg')
-    qc.add_register(tmp_b)
-    for i in range(n):
-        qc.cx(b_reg[i], tmp_b[i])
-    invert(qc, tmp_b)
-
-    diff = add(qc, a_reg, tmp_b)
-
-    out = QuantumRegister(1, name='gt')
-    qc.add_register(out)
-
-    # MSB = 0 → result is positive → a > b
-    # So write NOT(MSB) into output
-    qc.x(diff[n - 1])
-    qc.cx(diff[n - 1], out[0])
-    qc.x(diff[n - 1])  # restore original state
-
-    invert(qc, tmp_b)
-    return out[0]
+    return less_than(qc, b_reg, a_reg)
 
 def less_equal(qc, a_reg, b_reg):
     """
@@ -497,6 +486,8 @@ def greater_equal(qc, a_reg, b_reg):
     return ge[0]
 
 def measure_single(qc, qubit, name="result"):
+    """Attach a classical bit measuring ``qubit`` to ``qc``."""
+
     creg = ClassicalRegister(1, name=name)
     qc.add_register(creg)
     qc.measure(qubit, creg[0])
@@ -614,8 +605,12 @@ def simulate(qc, shots=1024):
         qc (QuantumCircuit): The quantum circuit to simulate.
         shots (int): The number of shots for the simulation.
     """
-    backend = AerSimulator(method='matrix_product_state')
-    transpiled = transpile(qc, backend)
+    if AerSimulator is not None:
+        backend = AerSimulator(method="matrix_product_state")
+        transpiled = transpile(qc, backend)
+    else:
+        backend = BasicSimulator()
+        transpiled = qc
     job = backend.run(transpiled, shots=shots)
     counts = job.result().get_counts()
 
