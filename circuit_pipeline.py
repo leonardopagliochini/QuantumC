@@ -7,6 +7,8 @@ from qiskit import QuantumCircuit
 
 from xdsl.dialects.func import ReturnOp
 
+from astJsonGen import astJsonGen
+
 from quantum_dialect import (
     QuantumInitOp,
     QAddiOp,
@@ -99,7 +101,8 @@ class QuantumCircuitPipeline(QuantumIR):
 def main() -> None:
     """CLI entry point mirroring :mod:`pipeline` with circuit generation."""
     import sys
-
+    
+    astJsonGen(input_dir="c_code")
     input_json = sys.argv[1] if len(sys.argv) > 1 else "json_out/try.json"
     pipeline = QuantumCircuitPipeline(json_path=input_json)
     pipeline.run_dataclass()

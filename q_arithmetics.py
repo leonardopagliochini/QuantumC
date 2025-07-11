@@ -395,6 +395,112 @@ def divi(qc, a_reg, b):
 
     return q_reg
 
+def equal(qc, a_reg, b_reg):
+    n = len(a_reg)
+    assert len(b_reg) == n
+
+    xor_reg = QuantumRegister(n, name="xor")
+    qc.add_register(xor_reg)
+    for i in range(n):
+        qc.cx(a_reg[i], xor_reg[i])
+        qc.cx(b_reg[i], xor_reg[i])
+
+    out = QuantumRegister(1, name="eq")
+    qc.add_register(out)
+    qc.x(out[0])
+    for i in range(n):
+        qc.cx(xor_reg[i], out[0])
+    return out[0]
+
+
+
+def not_equal(qc, a_reg, b_reg):
+    """
+    Compares a != b and stores result in a single qubit.
+    """
+    eq = equal(qc, a_reg, b_reg)
+    neq = QuantumRegister(1, name='neq')
+    qc.add_register(neq)
+    qc.x(neq[0])       # start in |1>
+    qc.cx(eq, neq[0])  # flip to 0 if eq is 1 → result = not(eq)
+    return neq[0]
+
+def less_than(qc, a_reg, b_reg):
+    """
+    Compares a < b (signed) and stores the result in a single qubit.
+    """
+    n = len(a_reg)
+    assert len(b_reg) == n
+
+    tmp_b = QuantumRegister(n, name='bneg')
+    qc.add_register(tmp_b)
+    for i in range(n):
+        qc.cx(b_reg[i], tmp_b[i])
+    invert(qc, tmp_b)  # compute -b
+
+    diff = add(qc, a_reg, tmp_b)
+
+    out = QuantumRegister(1, name='lt')
+    qc.add_register(out)
+    qc.cx(diff[n - 1], out[0])  # MSB = 1 → negative → a < b
+
+    invert(qc, tmp_b)  # restore b
+    return out[0]
+
+def greater_than(qc, a_reg, b_reg):
+    """
+    Compares a > b (signed) and stores the result in a single qubit.
+    """
+    n = len(a_reg)
+    assert len(b_reg) == n
+
+    tmp_b = QuantumRegister(n, name='bneg')
+    qc.add_register(tmp_b)
+    for i in range(n):
+        qc.cx(b_reg[i], tmp_b[i])
+    invert(qc, tmp_b)
+
+    diff = add(qc, a_reg, tmp_b)
+
+    out = QuantumRegister(1, name='gt')
+    qc.add_register(out)
+
+    # MSB = 0 → result is positive → a > b
+    # So write NOT(MSB) into output
+    qc.x(diff[n - 1])
+    qc.cx(diff[n - 1], out[0])
+    qc.x(diff[n - 1])  # restore original state
+
+    invert(qc, tmp_b)
+    return out[0]
+
+def less_equal(qc, a_reg, b_reg):
+    """
+    Compares a <= b and returns a single qubit with result.
+    """
+    gt = greater_than(qc, a_reg, b_reg)
+    le = QuantumRegister(1, name='le')
+    qc.add_register(le)
+    qc.x(le[0])       # start in |1>
+    qc.cx(gt, le[0])  # flip to 0 if gt is 1 → a <= b ⇔ not (a > b)
+    return le[0]
+
+def greater_equal(qc, a_reg, b_reg):
+    """
+    Compares a >= b and returns a single qubit with result.
+    """
+    lt = less_than(qc, a_reg, b_reg)
+    ge = QuantumRegister(1, name='ge')
+    qc.add_register(ge)
+    qc.x(ge[0])
+    qc.cx(lt, ge[0])
+    return ge[0]
+
+def measure_single(qc, qubit, name="result"):
+    creg = ClassicalRegister(1, name=name)
+    qc.add_register(creg)
+    qc.measure(qubit, creg[0])
+
 # def div(qc, a_reg, b_reg, a_val=None, b_val=None):
 #     """
 #     Integer division: a / b where both a and b are quantum registers.
