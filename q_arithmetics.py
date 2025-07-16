@@ -433,6 +433,59 @@ def divi(qc, a_reg, divisor, n_output_bits=None):
     return qout
 
 
+def div(qc, dividend_reg, divisor_reg, quotient_reg, remainder_reg):
+    """Divide two positive integers stored in quantum registers.
+
+    This function implements a restoring division algorithm using the
+    existing arithmetic helpers. The ``quotient_reg`` and ``remainder_reg``
+    registers must be instantiated by the caller and have the same size as
+    ``dividend_reg``. The implementation assumes ``divisor_reg`` encodes a value
+    less than or equal to ``dividend_reg`` to avoid overflow during the
+    intermediate subtraction steps.
+
+    Parameters
+    ----------
+    qc : QuantumCircuit
+        Circuit to modify.
+    dividend_reg : QuantumRegister
+        Dividend quantum register.
+    divisor_reg : QuantumRegister
+        Divisor quantum register.
+    quotient_reg : QuantumRegister
+        Register that will contain the quotient (LSB first).
+    remainder_reg : QuantumRegister
+        Register that will contain the remainder.
+
+    Returns
+    -------
+    Tuple[QuantumRegister, QuantumRegister]
+        ``quotient_reg`` and ``remainder_reg`` for convenience.
+    """
+    n = len(dividend_reg)
+    if len(divisor_reg) != n or len(remainder_reg) != n or len(quotient_reg) != n - 1:
+        raise ValueError("Invalid register sizes for division")
+
+    # Initialize remainder with dividend
+    for i in range(n):
+        qc.cx(dividend_reg[i], remainder_reg[i])
+
+    # Classical restoring division loop unrolled for quantum operations
+    for i in reversed(range(n - 1)):
+        shifted_div = muli(qc, divisor_reg, 2 ** i, n_output_bits=n)
+        diff = sub(qc, remainder_reg, shifted_div)
+
+        ge_flag = QuantumRegister(1, name=f"ge{i}")
+        qc.add_register(ge_flag)
+        qc.x(ge_flag[0])
+        qc.cx(diff[n - 1], ge_flag[0])  # sign bit set → remainder < shifted_div
+
+        for j in range(n):
+            qc.cswap(ge_flag[0], remainder_reg[j], diff[j])
+        qc.cx(ge_flag[0], quotient_reg[i])
+
+    return quotient_reg, remainder_reg
+
+
 def equal(qc, a_reg, b_reg):
     """Return a qubit set to ``|1>`` if ``a_reg == b_reg``."""
 
@@ -564,23 +617,18 @@ def simulate(qc, shots=1024):
     print(f"Measured bitstring: {bitstring}")
 
     offset = 0
-    for reg in reversed(qc.qregs):  # Reverse: Qiskit stacks qubits from last to first
-        reg_size = len(reg)
+    for creg in reversed(qc.cregs):
+        reg_size = len(creg)
         reg_bits = bitstring[offset:offset + reg_size]
         offset += reg_size
 
-        if len(reg_bits) < reg_size:
-            print(f"Register {reg.name}: not fully measured or missing.")
-            continue
-
-        # Interpret as two's complement
         unsigned = int(reg_bits, 2)
-        if reg_bits[0] == '1':
+        if reg_bits and reg_bits[0] == '1' and reg_size > 1:
             signed = unsigned - (1 << reg_size)
         else:
             signed = unsigned
 
-        print(f"Register {reg.name}: binary = {reg_bits}, value (2's complement) = {signed}")
+        print(f"Register {creg.name}: binary = {reg_bits}, value (2's complement) = {signed}")
 
     return signed
 
