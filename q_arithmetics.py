@@ -606,7 +606,7 @@ def simulate(qc, shots=1024):
         transpiled = transpile(qc, backend)
     else:
         backend = BasicSimulator()
-        transpiled = qc
+        transpiled = transpile(qc, backend)
     job = backend.run(transpiled, shots=shots)
     counts = job.result().get_counts()
 
