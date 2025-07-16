@@ -391,6 +391,32 @@ def divu(qc, a_reg, divisor, n_output_bits=None, a_val=None):
     return qout
 
 
+def divui(qc, a_reg, divisor, n_output_bits=None, a_val=None):
+    """Divide ``a_reg`` by unsigned integer ``divisor`` and return the quotient.
+
+    ``divui`` behaves like :func:`divu` but is provided for API symmetry with
+    other immediate operations such as :func:`addi` or :func:`muli`.
+    The ``divisor`` is a classical value known at compile time.
+
+    Args:
+        qc (QuantumCircuit): Circuit to modify.
+        a_reg (QuantumRegister): Dividend register.
+        divisor (int): Unsigned integer divisor.
+        n_output_bits (int, optional): Size of the output register. Defaults to
+            ``len(a_reg)``.
+        a_val (int, optional): If the classical value of ``a_reg`` is known,
+            it can be provided to classically initialise the output.
+
+    Returns:
+        QuantumRegister: Register holding the quotient of ``a_reg`` divided by
+            ``divisor``.
+    """
+
+    # Delegate to ``divu`` since the current implementation already assumes an
+    # immediate divisor.
+    return divu(qc, a_reg, divisor, n_output_bits=n_output_bits, a_val=a_val)
+
+
 def _controlled_addi_in_place(qc, qreg, value, control):
     """Add ``value`` to ``qreg`` controlled by ``control`` qubit.
 
