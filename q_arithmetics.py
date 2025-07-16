@@ -538,39 +538,6 @@ def _unsigned_division(qc, dividend_reg, divisor_reg, quotient_reg, remainder_re
             qc.swap(remainder_reg[j], shifted[j])
 
 
-
-def div_unsigned(qc, dividend_reg, divisor_reg, quotient_reg, remainder_reg):
-    """Divide two unsigned integers stored in quantum registers.
-
-    The routine implements the restoring division algorithm and expects all
-    registers (except ``quotient_reg``) to have the same size.  ``quotient_reg``
-    may contain fewer qubits in which case the result will be truncated.  Both
-    output registers must be initialised to ``|0>`` before calling this
-    function.
-
-    Parameters
-    ----------
-    qc : QuantumCircuit
-        Circuit to modify.
-    dividend_reg : QuantumRegister
-        Dividend register (``n`` qubits).
-    divisor_reg : QuantumRegister
-        Divisor register (``n`` qubits).
-    quotient_reg : QuantumRegister
-        Output register for the quotient.
-    remainder_reg : QuantumRegister
-        Output register for the remainder.
-    """
-
-    n = len(dividend_reg)
-    if len(divisor_reg) != n or len(remainder_reg) != n:
-        raise ValueError("Register size mismatch in div_unsigned")
-
-    _unsigned_division(qc, dividend_reg, divisor_reg, quotient_reg, remainder_reg)
-
-    return quotient_reg, remainder_reg
-
-
 def equal(qc, a_reg, b_reg):
     """Return a qubit set to ``|1>`` if ``a_reg == b_reg``."""
 
