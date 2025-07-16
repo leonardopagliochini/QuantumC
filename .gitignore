@@ -2,3 +2,5 @@
 __pycache__
 output
 json_out
+qvenv/
+test_results.csv

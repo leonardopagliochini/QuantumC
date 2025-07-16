@@ -492,6 +492,9 @@ def simulate(qc, shots=1024):
     Args:
         qc (QuantumCircuit): The quantum circuit to simulate.
         shots (int): The number of shots for the simulation.
+
+    Returns:
+        dict: Mapping of register name to a dictionary with ``binary`` and ``value``.
     """
     backend = AerSimulator(method='matrix_product_state')
     transpiled = transpile(qc, backend)
@@ -504,6 +507,7 @@ def simulate(qc, shots=1024):
 
     print(f"Measured bitstring: {bitstring}")
 
+    results = {}
     offset = 0
     for reg in reversed(qc.qregs):  # Reverse: Qiskit stacks qubits from last to first
         reg_size = len(reg)
@@ -522,8 +526,9 @@ def simulate(qc, shots=1024):
             signed = unsigned
 
         print(f"Register {reg.name}: binary = {reg_bits}, value (2's complement) = {signed}")
+        results[reg.name] = {"binary": reg_bits, "value": signed}
 
-    return signed
+    return results
 
 
 
