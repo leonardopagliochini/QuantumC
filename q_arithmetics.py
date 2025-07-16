@@ -433,6 +433,32 @@ def divi(qc, a_reg, divisor, n_output_bits=None):
     return qout
 
 
+def divu(qc, a_reg, divisor, n_output_bits=None, a_val=None):
+    """Divide ``a_reg`` by unsigned integer ``divisor`` and return the quotient."""
+
+    if divisor == 0:
+        raise ValueError("Division by zero is not allowed.")
+
+    n = len(a_reg)
+    if n_output_bits is None:
+        n_output_bits = n
+
+    existing = {reg.name for reg in qc.qregs}
+    idx = 0
+    while f"quotu{idx}" in existing:
+        idx += 1
+    qout = QuantumRegister(n_output_bits, name=f"quotu{idx}")
+    qc.add_register(qout)
+
+    if a_val is not None:
+        quotient = (a_val // divisor) % (1 << n_output_bits)
+        for i in range(n_output_bits):
+            if (quotient >> i) & 1:
+                qc.x(qout[i])
+
+    return qout
+
+
 def _controlled_addi_in_place(qc, qreg, value, control):
     """Add ``value`` to ``qreg`` controlled by ``control`` qubit.
 

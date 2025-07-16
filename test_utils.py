@@ -13,6 +13,11 @@ def range_signed(n):
     return range(min_val, max_val + 1)
 
 
+def range_unsigned(n):
+    """Return all unsigned integers representable with ``n`` bits."""
+    return range(0, 1 << n)
+
+
 def twos(value, n):
     """Convert ``value`` to a signed ``n``-bit integer."""
     value %= 1 << n
@@ -27,7 +32,13 @@ def to_binary(value, n):
     return "".join(str(b) for b in bits[::-1])
 
 
-def run_circuit(qc):
+def to_binary_unsigned(value, n):
+    """Return the ``n``-bit binary string for unsigned ``value``."""
+    bits = [(value >> i) & 1 for i in range(n)]
+    return "".join(str(b) for b in bits[::-1])
+
+
+def run_circuit(qc, signed=True):
     """Simulate ``qc`` and return measured registers as (bits, int)."""
     if AerSimulator is not None:
         backend = AerSimulator(method="matrix_product_state")
@@ -47,11 +58,11 @@ def run_circuit(qc):
             values[creg.name] = ("".rjust(len(creg), "0"), 0)
             continue
         unsigned = int(reg_bits, 2)
-        if reg_bits[0] == "1" and len(creg) > 1:
-            signed = unsigned - (1 << len(creg))
+        if signed and reg_bits[0] == "1" and len(creg) > 1:
+            sval = unsigned - (1 << len(creg))
         else:
-            signed = unsigned
-        values[creg.name] = (reg_bits, signed)
+            sval = unsigned
+        values[creg.name] = (reg_bits, sval)
     return values
 
 
