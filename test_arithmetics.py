@@ -74,11 +74,23 @@ def _run_circuit(qc):
 
 
 def _test_add():
-    """Exhaustively test addition."""
+    """Exhaustively test addition.
+
+    The function prints which operands are tested and how many
+    combinations will be executed before running the circuits.
+    """
     n = TOTAL_QUBITS // 3
     rows = []
-    for a in _range_signed(n):
-        for b in _range_signed(n):
+    vals = list(_range_signed(n))
+    total = len(vals) * len(vals)
+    min_val = vals[0]
+    max_val = vals[-1]
+    print(
+        f"add: testing a and b in range {min_val}..{max_val}, {total} operations"
+    )
+    for a in vals:
+        for b in vals:
+            print(f"add: a={a}, b={b}")
             set_number_of_bits(n)
             qc = QuantumCircuit()
             ar = initialize_variable(qc, a, "a")
@@ -95,8 +107,16 @@ def _test_addi():
     """Exhaustively test addition with a classical constant."""
     n = TOTAL_QUBITS // 2
     rows = []
-    for a in _range_signed(n):
-        for b in _range_signed(n):
+    vals = list(_range_signed(n))
+    total = len(vals) * len(vals)
+    min_val = vals[0]
+    max_val = vals[-1]
+    print(
+        f"addi: testing a and b in range {min_val}..{max_val}, {total} operations"
+    )
+    for a in vals:
+        for b in vals:
+            print(f"addi: a={a}, b={b}")
             set_number_of_bits(n)
             qc = QuantumCircuit()
             ar = initialize_variable(qc, a, "a")
@@ -112,8 +132,16 @@ def _test_sub():
     """Exhaustively test subtraction."""
     n = TOTAL_QUBITS // 3
     rows = []
-    for a in _range_signed(n):
-        for b in _range_signed(n):
+    vals = list(_range_signed(n))
+    total = len(vals) * len(vals)
+    min_val = vals[0]
+    max_val = vals[-1]
+    print(
+        f"sub: testing a and b in range {min_val}..{max_val}, {total} operations"
+    )
+    for a in vals:
+        for b in vals:
+            print(f"sub: a={a}, b={b}")
             set_number_of_bits(n)
             qc = QuantumCircuit()
             ar = initialize_variable(qc, a, "a")
@@ -130,8 +158,16 @@ def _test_subi():
     """Exhaustively test subtraction by a classical constant."""
     n = TOTAL_QUBITS // 2
     rows = []
-    for a in _range_signed(n):
-        for b in _range_signed(n):
+    vals = list(_range_signed(n))
+    total = len(vals) * len(vals)
+    min_val = vals[0]
+    max_val = vals[-1]
+    print(
+        f"subi: testing a and b in range {min_val}..{max_val}, {total} operations"
+    )
+    for a in vals:
+        for b in vals:
+            print(f"subi: a={a}, b={b}")
             set_number_of_bits(n)
             qc = QuantumCircuit()
             ar = initialize_variable(qc, a, "a")
@@ -147,8 +183,16 @@ def _test_mul():
     """Exhaustively test multiplication."""
     n = TOTAL_QUBITS // 3
     rows = []
-    for a in _range_signed(n):
-        for b in _range_signed(n):
+    vals = list(_range_signed(n))
+    total = len(vals) * len(vals)
+    min_val = vals[0]
+    max_val = vals[-1]
+    print(
+        f"mul: testing a and b in range {min_val}..{max_val}, {total} operations"
+    )
+    for a in vals:
+        for b in vals:
+            print(f"mul: a={a}, b={b}")
             set_number_of_bits(n)
             qc = QuantumCircuit()
             ar = initialize_variable(qc, a, "a")
@@ -165,8 +209,16 @@ def _test_muli():
     """Exhaustively test multiplication by a classical constant."""
     n = TOTAL_QUBITS // 2
     rows = []
-    for a in _range_signed(n):
-        for b in _range_signed(n):
+    vals = list(_range_signed(n))
+    total = len(vals) * len(vals)
+    min_val = vals[0]
+    max_val = vals[-1]
+    print(
+        f"muli: testing a and b in range {min_val}..{max_val}, {total} operations"
+    )
+    for a in vals:
+        for b in vals:
+            print(f"muli: a={a}, b={b}")
             set_number_of_bits(n)
             qc = QuantumCircuit()
             ar = initialize_variable(qc, a, "a")
@@ -186,9 +238,17 @@ def _test_division():
         n += 1
     n -= 1
     rows = []
-    # div() works only with positive integers. Limit the range accordingly
-    for a in range(0, 1 << (n - 1)):
-        for b in range(1, 1 << (n - 1)):
+    min_a = 0
+    max_a = (1 << (n - 1)) - 1
+    min_b = 1
+    max_b = (1 << (n - 1)) - 1
+    total = (max_a - min_a + 1) * (max_b - min_b + 1)
+    print(
+        f"div: testing a in {min_a}..{max_a} and b in {min_b}..{max_b}, {total} operations"
+    )
+    for a in range(min_a, max_a + 1):
+        for b in range(min_b, max_b + 1):
+            print(f"div: a={a}, b={b}")
             set_number_of_bits(n)
             qc = QuantumCircuit()
             dividend = initialize_variable(qc, a, "n")
@@ -214,10 +274,18 @@ def _test_divi():
     """Exhaustively test division by a classical constant."""
     n = TOTAL_QUBITS // 3
     rows = []
-    for a in _range_signed(n):
-        for b in _range_signed(n):
-            if b == 0:
-                continue
+    vals = list(_range_signed(n))
+    min_val = vals[0]
+    max_val = vals[-1]
+    # exclude zero for divisor
+    b_vals = [v for v in vals if v != 0]
+    total = len(vals) * len(b_vals)
+    print(
+        f"divi: testing a in {min_val}..{max_val} and b in {min_val}..{max_val} (excluding 0), {total} operations"
+    )
+    for a in vals:
+        for b in b_vals:
+            print(f"divi: a={a}, b={b}")
             set_number_of_bits(n)
             qc = QuantumCircuit()
             ar = initialize_variable(qc, a, "a")
