@@ -7,7 +7,7 @@ def main():
     """Run the division test and print the result table."""
     ta.TOTAL_QUBITS = 16
     rows = ta._test_division()
-    ta._print_table(rows)
+    ta._print_table(rows, csv_path="test_log/test_division.csv")
 
 
 if __name__ == "__main__":
