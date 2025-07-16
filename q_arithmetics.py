@@ -433,55 +433,143 @@ def divi(qc, a_reg, divisor, n_output_bits=None):
     return qout
 
 
-def div(qc, dividend_reg, divisor_reg, quotient_reg, remainder_reg):
-    """Divide two positive integers stored in quantum registers.
+def _controlled_addi_in_place(qc, qreg, value, control):
+    """Add ``value`` to ``qreg`` controlled by ``control`` qubit.
 
-    This function implements a restoring division algorithm using the
-    existing arithmetic helpers. The ``quotient_reg`` and ``remainder_reg``
-    registers must be instantiated by the caller and have the same size as
-    ``dividend_reg``. The implementation assumes ``divisor_reg`` encodes a value
-    less than or equal to ``dividend_reg`` to avoid overflow during the
-    intermediate subtraction steps.
+    This helper uses the QFT based addition logic from :func:`addi_in_place`
+    but applies the phase rotations only when ``control`` is ``|1>``.  The
+    function assumes that ``qreg`` is ``len(qreg)`` qubits long and that the
+    global :data:`NUMBER_OF_BITS` matches this size.
+    """
+
+    n = len(qreg)
+    qc.append(QFT(n, do_swaps=False), qreg)
+
+    b_bin = int_to_twos_complement(value)
+    b_int = int("".join(str(x) for x in b_bin[::-1]), 2)
+    b_val = b_int if value >= 0 else b_int - (1 << n)
+
+    for j in range(n):
+        angle = (b_val * 2 * np.pi) / (2 ** (j + 1))
+        if angle != 0:
+            qc.cp(angle, control, qreg[j])
+
+    qc.append(QFT(n, do_swaps=False).inverse(), qreg)
+
+
+def _conditional_invert(qc, qreg, control):
+    """Conditionally negate ``qreg`` if ``control`` is ``|1>``."""
+
+    for qubit in qreg:
+        qc.cx(control, qubit)
+
+    _controlled_addi_in_place(qc, qreg, 1, control)
+
+
+def _shift_left(qc, qreg, shift, n_out=None):
+    """Return a new register with ``qreg`` shifted left by ``shift`` bits."""
+
+    if n_out is None:
+        n_out = len(qreg)
+
+    base = f"{qreg.name}_shl{shift}"
+    existing = {reg.name for reg in qc.qregs}
+    idx = 0
+    while f"{base}{idx}" in existing:
+        idx += 1
+    out = QuantumRegister(n_out, name=f"{base}{idx}")
+    qc.add_register(out)
+
+    for i in range(len(qreg)):
+        if i + shift < n_out:
+            qc.cx(qreg[i], out[i + shift])
+
+    return out
+
+
+def _unsigned_division(qc, dividend_reg, divisor_reg, quotient_reg, remainder_reg):
+    """Perform unsigned restoring division using comparison-based logic.
+
+    The ``dividend_reg`` and ``divisor_reg`` are treated as unsigned integers
+    encoded in two's complement.  ``quotient_reg`` and ``remainder_reg`` hold
+    the unsigned quotient and remainder, respectively.  This routine assumes
+    ``len(remainder_reg) == len(dividend_reg)``.
+    """
+
+    n = len(remainder_reg)
+    m = len(quotient_reg)
+
+    for i in range(n):
+        qc.cx(dividend_reg[i], remainder_reg[i])
+
+    for i in reversed(range(m)):
+        shifted = _shift_left(qc, divisor_reg, i, n)
+        ge_flag = greater_equal(qc, remainder_reg, shifted)
+        diff = sub(qc, remainder_reg, shifted)
+
+        for j in range(n):
+            qc.cswap(ge_flag, remainder_reg[j], diff[j])
+        qc.cx(ge_flag, quotient_reg[i])
+
+
+
+def div(qc, dividend_reg, divisor_reg, quotient_reg, remainder_reg):
+    """Divide two signed integers stored in quantum registers.
+
+    The implementation follows the algorithm described in the repository
+    ``AGENTS.md`` instructions.  The input registers ``dividend_reg`` and
+    ``divisor_reg`` are treated as two's complement signed integers.  The
+    absolute values are divided using a restoring division algorithm and then
+    the correct signs are applied to the quotient and remainder.  The remainder
+    sign follows the C convention (same sign as the dividend).
 
     Parameters
     ----------
     qc : QuantumCircuit
         Circuit to modify.
     dividend_reg : QuantumRegister
-        Dividend quantum register.
+        Dividend register (``n`` qubits).
     divisor_reg : QuantumRegister
-        Divisor quantum register.
+        Divisor register (``n`` qubits).
     quotient_reg : QuantumRegister
-        Register that will contain the quotient (LSB first).
+        Output register for the quotient.
     remainder_reg : QuantumRegister
-        Register that will contain the remainder.
-
-    Returns
-    -------
-    Tuple[QuantumRegister, QuantumRegister]
-        ``quotient_reg`` and ``remainder_reg`` for convenience.
+        Output register for the remainder.
     """
+
     n = len(dividend_reg)
-    if len(divisor_reg) != n or len(remainder_reg) != n or len(quotient_reg) != n - 1:
-        raise ValueError("Invalid register sizes for division")
+    if len(divisor_reg) != n or len(remainder_reg) != n:
+        raise ValueError("Register size mismatch in div")
 
-    # Initialize remainder with dividend
-    for i in range(n):
-        qc.cx(dividend_reg[i], remainder_reg[i])
+    sign_a = QuantumRegister(1, name="sign_a")
+    sign_b = QuantumRegister(1, name="sign_b")
+    qc.add_register(sign_a)
+    qc.add_register(sign_b)
 
-    # Classical restoring division loop unrolled for quantum operations
-    for i in reversed(range(n - 1)):
-        shifted_div = muli(qc, divisor_reg, 2 ** i, n_output_bits=n)
-        diff = sub(qc, remainder_reg, shifted_div)
+    qc.cx(dividend_reg[n - 1], sign_a[0])
+    qc.cx(divisor_reg[n - 1], sign_b[0])
 
-        ge_flag = QuantumRegister(1, name=f"ge{i}")
-        qc.add_register(ge_flag)
-        qc.x(ge_flag[0])
-        qc.cx(diff[n - 1], ge_flag[0])  # sign bit set → remainder < shifted_div
+    _conditional_invert(qc, dividend_reg, sign_a[0])
+    _conditional_invert(qc, divisor_reg, sign_b[0])
 
-        for j in range(n):
-            qc.cswap(ge_flag[0], remainder_reg[j], diff[j])
-        qc.cx(ge_flag[0], quotient_reg[i])
+    _unsigned_division(qc, dividend_reg, divisor_reg, quotient_reg, remainder_reg)
+
+    sign_q = QuantumRegister(1, name="sign_q")
+    qc.add_register(sign_q)
+    qc.cx(sign_a[0], sign_q[0])
+    qc.cx(sign_b[0], sign_q[0])
+
+    _conditional_invert(qc, quotient_reg, sign_q[0])
+    _conditional_invert(qc, remainder_reg, sign_a[0])
+
+    qc.cx(sign_b[0], sign_q[0])
+    qc.cx(sign_a[0], sign_q[0])
+
+    _conditional_invert(qc, divisor_reg, sign_b[0])
+    _conditional_invert(qc, dividend_reg, sign_a[0])
+
+    qc.cx(divisor_reg[n - 1], sign_b[0])
+    qc.cx(dividend_reg[n - 1], sign_a[0])
 
     return quotient_reg, remainder_reg
 
@@ -531,7 +619,11 @@ def less_than(qc, a_reg, b_reg):
     n = len(a_reg)
     assert len(b_reg) == n
 
-    tmp_b = QuantumRegister(n, name='bneg')
+    existing = {reg.name for reg in qc.qregs}
+    idx = 0
+    while f"bneg{idx}" in existing:
+        idx += 1
+    tmp_b = QuantumRegister(n, name=f"bneg{idx}")
     qc.add_register(tmp_b)
     for i in range(n):
         qc.cx(b_reg[i], tmp_b[i])
@@ -539,7 +631,11 @@ def less_than(qc, a_reg, b_reg):
 
     diff = add(qc, a_reg, tmp_b)
 
-    out = QuantumRegister(1, name='lt')
+    existing = {reg.name for reg in qc.qregs}
+    idx = 0
+    while f"lt{idx}" in existing:
+        idx += 1
+    out = QuantumRegister(1, name=f"lt{idx}")
     qc.add_register(out)
     qc.cx(diff[n - 1], out[0])  # MSB = 1 → negative → a < b
 
@@ -567,7 +663,11 @@ def greater_equal(qc, a_reg, b_reg):
     Compares a >= b and returns a single qubit with result.
     """
     lt = less_than(qc, a_reg, b_reg)
-    ge = QuantumRegister(1, name='ge')
+    existing = {reg.name for reg in qc.qregs}
+    idx = 0
+    while f"ge{idx}" in existing:
+        idx += 1
+    ge = QuantumRegister(1, name=f"ge{idx}")
     qc.add_register(ge)
     qc.x(ge[0])
     qc.cx(lt, ge[0])
