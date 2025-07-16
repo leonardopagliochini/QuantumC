@@ -364,39 +364,74 @@ def muli(qc, a_reg, c, n_output_bits=None):
 
     return out_reg
 
-def divi(qc, a_reg, b):
+def divi(qc, a_reg, divisor, n_output_bits=None):
     """
-    Integer division of a quantum register by classical constant b.
-    Fixes bug where result was always zero due to short output register.
+    Divide a quantum register by a classical integer using QFT-based logic.
+    Supports signed division using two's complement.
 
     Args:
-        qc (QuantumCircuit): Circuit.
-        a_reg (QuantumRegister): Input register.
-        b (int): Classical constant divisor (≠ 0).
+        qc (QuantumCircuit): The quantum circuit to modify.
+        a_reg (QuantumRegister): Dividend quantum register (signed integer in 2's complement).
+        divisor (int): Classical divisor (can be negative).
+        n_output_bits (int, optional): Number of bits in output register. Default = len(a_reg).
 
     Returns:
-        QuantumRegister: Quotient register.
+        QuantumRegister: New quantum register with the result of floor(a / divisor).
     """
-    if b == 0:
-        raise ValueError("Division by zero.")
+    if divisor == 0:
+        raise ValueError("Division by zero is not allowed.")
 
     n = len(a_reg)
-    b_abs = abs(b)
+    if n_output_bits is None:
+        n_output_bits = n
 
-    m = (1 << n) // b_abs
+    existing = {reg.name for reg in qc.qregs}
+    idx = 0
+    while f"quot{idx}" in existing:
+        idx += 1
+    qout = QuantumRegister(n_output_bits, name=f"quot{idx}")
+    qc.add_register(qout)
 
-    # Multiply using 2n-bit output
-    tmp = muli(qc, a_reg, m, n_output_bits=2 * n)
+    # QFT on output
+    qc.append(QFT(n_output_bits, do_swaps=False), qout)
 
-    q_reg = QuantumRegister(n, name="quot")
-    qc.add_register(q_reg)
-    for i in range(n):
-        qc.cx(tmp[i + n], q_reg[i])
+    abs_divisor = abs(divisor)
+    for j in range(n):
+        for k in range(n_output_bits):
+            angle = (2 * np.pi * (2 ** j) / abs_divisor) / (2 ** (k + 1))
+            angle = angle % (2 * np.pi)
+            if angle != 0:
+                qc.cp(angle, a_reg[j], qout[k])
 
-    if b < 0:
-        invert(qc, q_reg)
+    # Inverse QFT
+    qc.append(QFT(n_output_bits, do_swaps=False).inverse(), qout)
 
-    return q_reg
+    # Sign correction if divisor < 0
+    if divisor < 0:
+        invert(qc, qout)
+
+    # Sign correction if dividend < 0
+    sign_flag = a_reg[n - 1]
+    tmp = QuantumRegister(n_output_bits, name=f"tmpinv{idx}")
+    qc.add_register(tmp)
+
+    # Copy qout to tmp
+    for i in range(n_output_bits):
+        qc.cx(qout[i], tmp[i])
+
+    # Bitwise NOT on tmp (conditional via control)
+    for i in range(n_output_bits):
+        qc.cx(sign_flag, tmp[i])
+
+    # Add 1 to tmp
+    addi_in_place(qc, tmp, 1)
+
+    # Conditionally move tmp back to qout using CSWAP
+    for i in range(n_output_bits):
+        qc.cswap(sign_flag, qout[i], tmp[i])
+
+    return qout
+
 
 def equal(qc, a_reg, b_reg):
     """Return a qubit set to ``|1>`` if ``a_reg == b_reg``."""
@@ -491,98 +526,6 @@ def measure_single(qc, qubit, name="result"):
     creg = ClassicalRegister(1, name=name)
     qc.add_register(creg)
     qc.measure(qubit, creg[0])
-
-# def div(qc, a_reg, b_reg, a_val=None, b_val=None):
-#     """
-#     Integer division: a / b where both a and b are quantum registers.
-#     Implements a restoring division algorithm using QFT-based arithmetic.
-    
-#     Args:
-#         qc (QuantumCircuit): Circuit to modify.
-#         a_reg (QuantumRegister): Dividend register (n qubits).
-#         b_reg (QuantumRegister): Divisor register (n qubits).
-#         a_val (int, optional): Classical value of a (for sign correction).
-#         b_val (int, optional): Classical value of b (for sign correction).
-    
-#     Returns:
-#         QuantumRegister: Quotient register.
-#     """
-#     n = len(a_reg)
-    
-#     # Registers
-#     r_reg = QuantumRegister(n, name='rem')     # remainder
-#     q_reg = QuantumRegister(n, name='quot')    # quotient
-#     tmp_reg = QuantumRegister(n, name='tmp')   # temp for subtraction
-#     qc.add_register(r_reg, q_reg, tmp_reg)
-
-#     # Initialize R to 0, Q to a
-#     for i in range(n):
-#         qc.cx(a_reg[i], q_reg[i])  # Q = A
-
-#     # Repeat n times
-#     for step in range(n):
-#         # Shift left (R,Q)
-#         for i in reversed(range(1, n)):
-#             qc.cx(q_reg[i - 1], q_reg[i])
-#             qc.cx(r_reg[i - 1], r_reg[i])
-#         qc.cx(q_reg[n - 1], r_reg[0])  # MSB of Q into LSB of R
-
-#         # Save a copy of R into tmp for possible restoration
-#         for i in range(n):
-#             qc.cx(r_reg[i], tmp_reg[i])
-
-#         # R = R - B
-#         invert(qc, b_reg)
-#         r_minus_b = add(qc, r_reg, b_reg)
-#         invert(qc, b_reg)  # Restore B
-
-#         # Check sign bit
-#         sign_bit = r_minus_b[n - 1]
-
-#         # If negative, restore R from tmp and set Q[0] = 0
-#         # Else, keep new R and set Q[0] = 1
-#         for i in range(n):
-#             qc.cx(sign_bit, tmp_reg[i])
-#             qc.ccx(sign_bit, tmp_reg[i], r_reg[i])
-
-#         qc.x(q_reg[0])  # Flip for conditional set
-#         qc.cx(sign_bit, q_reg[0])
-#         qc.x(q_reg[0])
-
-#     # Sign correction
-#     if a_val is not None and b_val is not None:
-#         if (a_val < 0) ^ (b_val < 0):
-#             invert(qc, q_reg)
-
-#     return q_reg
-
-# def shift_left_rq(qc, r_reg, q_reg):
-#     """
-#     Perform a logical left shift on the concatenated (R, Q) registers.
-#     Args:
-#         qc (QuantumCircuit): Circuit to modify.
-#         r_reg (QuantumRegister): Remainder register.
-#         q_reg (QuantumRegister): Quotient register.
-#     """
-#     n = len(r_reg)
-
-#     # Shift R bits to the left
-#     for i in reversed(range(1, n)):
-#         qc.cx(r_reg[i - 1], r_reg[i])
-#         qc.reset(r_reg[i - 1])  # zero after moving
-
-#     # MSB of Q becomes new LSB of R
-#     qc.cx(q_reg[n - 1], r_reg[0])
-#     qc.reset(q_reg[n - 1])  # clear after use
-
-#     # Shift Q bits to the left
-#     for i in reversed(range(1, n)):
-#         qc.cx(q_reg[i - 1], q_reg[i])
-#         qc.reset(q_reg[i - 1])  # zero after moving
-
-#     # Set LSB of Q to 0
-#     # (already reset)
-
 
 def measure(qc, qreg):
     """
