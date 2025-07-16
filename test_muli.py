@@ -7,7 +7,7 @@ def main():
     """Run the muli test and print the result table."""
     ta.TOTAL_QUBITS = 16
     rows = ta._test_muli()
-    ta._print_table(rows)
+    ta._print_table(rows, csv_path="test_log/test_muli.csv")
 
 
 if __name__ == "__main__":

@@ -7,6 +7,8 @@ possible inputs that fit in that space.  If ``TOTAL_QUBITS`` exceeds the
 simulator capability the tests will fail.
 """
 
+import csv
+import os
 from qiskit import QuantumCircuit, QuantumRegister, transpile
 from q_arithmetics import (
     set_number_of_bits,
@@ -297,11 +299,25 @@ def _test_divi():
     return rows
 
 
-def _print_table(rows):
-    """Print the results in a simple table."""
+def _print_table(rows, csv_path=None):
+    """Print results and optionally save them to ``csv_path``."""
     print("| op | a | b | expected | measured | ok |")
+    writer = None
+    if csv_path:
+        os.makedirs(os.path.dirname(csv_path), exist_ok=True)
+        file = open(csv_path, "w", newline="")
+        writer = csv.writer(file)
+        writer.writerow(["op", "a", "b", "expected", "measured", "ok"])
     for op, a, b, exp, res, ok in rows:
         print(f"| {op} | {a} | {b} | {exp} | {res} | {ok} |")
+        if writer:
+            writer.writerow([op, a, b, exp, res, ok])
+    if writer:
+        file.close()
+    if any(not r[-1] for r in rows):
+        print("Result check: FAIL")
+    else:
+        print("Result check: PASS")
 
 
 if __name__ == "__main__":
@@ -314,6 +330,6 @@ if __name__ == "__main__":
     all_rows += _test_muli()
     all_rows += _test_division()
     all_rows += _test_divi()
-    _print_table(all_rows)
+    _print_table(all_rows, csv_path="test_log/test_arithmetics.csv")
 
 

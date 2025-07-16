@@ -7,7 +7,7 @@ def main():
     """Run the subtraction test and print the result table."""
     ta.TOTAL_QUBITS = 16
     rows = ta._test_sub()
-    ta._print_table(rows)
+    ta._print_table(rows, csv_path="test_log/test_sub.csv")
 
 
 if __name__ == "__main__":
