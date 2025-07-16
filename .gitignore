@@ -7,4 +7,4 @@ qvenv
 mlir_out
 json_out
 .DS_Store
-box
+test_log/
