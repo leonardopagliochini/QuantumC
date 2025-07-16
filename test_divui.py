@@ -4,7 +4,7 @@ from qiskit import QuantumCircuit
 from q_arithmetics import set_number_of_bits, initialize_variable, measure, divui
 import test_utils as tu
 
-TOTAL_QUBITS = 8
+TOTAL_QUBITS = 10
 
 
 def main():
