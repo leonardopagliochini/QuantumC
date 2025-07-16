@@ -488,40 +488,65 @@ def _shift_left(qc, qreg, shift, n_out=None):
 
 
 def _unsigned_division(qc, dividend_reg, divisor_reg, quotient_reg, remainder_reg):
-    """Perform unsigned restoring division using comparison-based logic.
+    """Perform unsigned integer division using a restoring algorithm.
 
-    The ``dividend_reg`` and ``divisor_reg`` are treated as unsigned integers
-    encoded in two's complement.  ``quotient_reg`` and ``remainder_reg`` hold
-    the unsigned quotient and remainder, respectively.  This routine assumes
-    ``len(remainder_reg) == len(dividend_reg)``.
+    The algorithm follows the description in the accompanying paper
+    ``Quantum Circuit Design of Integer Division Optimizing Ancillary Qubits
+    and T\-Count``.  ``dividend_reg`` and ``divisor_reg`` contain the input
+    numbers in standard binary order (least significant bit first).  The
+    ``quotient_reg`` and ``remainder_reg`` must be initialised to ``|0>``.
+
+    Parameters
+    ----------
+    qc : QuantumCircuit
+        Circuit to modify.
+    dividend_reg : QuantumRegister
+        Dividend register (``n`` qubits).
+    divisor_reg : QuantumRegister
+        Divisor register (``n`` qubits).
+    quotient_reg : QuantumRegister
+        Output register for the quotient.  The number of qubits determines the
+        number of iterations and therefore the maximum representable quotient.
+    remainder_reg : QuantumRegister
+        Output register for the remainder (``n`` qubits).
     """
 
-    n = len(remainder_reg)
+    n = len(dividend_reg)
+    if len(divisor_reg) != n or len(remainder_reg) != n:
+        raise ValueError("Register size mismatch in _unsigned_division")
+
     m = len(quotient_reg)
 
-    for i in range(n):
-        qc.cx(dividend_reg[i], remainder_reg[i])
-
     for i in reversed(range(m)):
-        shifted = _shift_left(qc, divisor_reg, i, n)
-        ge_flag = greater_equal(qc, remainder_reg, shifted)
-        diff = sub(qc, remainder_reg, shifted)
+        # Left shift the remainder and insert the next dividend bit as LSB
+        shifted = _shift_left(qc, remainder_reg, 1, n)
+        qc.cx(dividend_reg[i], shifted[0])
 
+        # Compute shifted - divisor and check if shifted >= divisor
+        ge_flag = greater_equal(qc, shifted, divisor_reg)
+        diff = sub(qc, shifted, divisor_reg)
+
+        # If shifted >= divisor store the difference, otherwise keep shifted
         for j in range(n):
-            qc.cswap(ge_flag, remainder_reg[j], diff[j])
+            qc.cswap(ge_flag, shifted[j], diff[j])
+
+        # Record the current quotient bit
         qc.cx(ge_flag, quotient_reg[i])
 
+        # Move the new remainder back into ``remainder_reg``
+        for j in range(n):
+            qc.swap(remainder_reg[j], shifted[j])
 
 
-def div(qc, dividend_reg, divisor_reg, quotient_reg, remainder_reg):
-    """Divide two signed integers stored in quantum registers.
 
-    The implementation follows the algorithm described in the repository
-    ``AGENTS.md`` instructions.  The input registers ``dividend_reg`` and
-    ``divisor_reg`` are treated as two's complement signed integers.  The
-    absolute values are divided using a restoring division algorithm and then
-    the correct signs are applied to the quotient and remainder.  The remainder
-    sign follows the C convention (same sign as the dividend).
+def div_unsigned(qc, dividend_reg, divisor_reg, quotient_reg, remainder_reg):
+    """Divide two unsigned integers stored in quantum registers.
+
+    The routine implements the restoring division algorithm and expects all
+    registers (except ``quotient_reg``) to have the same size.  ``quotient_reg``
+    may contain fewer qubits in which case the result will be truncated.  Both
+    output registers must be initialised to ``|0>`` before calling this
+    function.
 
     Parameters
     ----------
@@ -539,37 +564,9 @@ def div(qc, dividend_reg, divisor_reg, quotient_reg, remainder_reg):
 
     n = len(dividend_reg)
     if len(divisor_reg) != n or len(remainder_reg) != n:
-        raise ValueError("Register size mismatch in div")
-
-    sign_a = QuantumRegister(1, name="sign_a")
-    sign_b = QuantumRegister(1, name="sign_b")
-    qc.add_register(sign_a)
-    qc.add_register(sign_b)
-
-    qc.cx(dividend_reg[n - 1], sign_a[0])
-    qc.cx(divisor_reg[n - 1], sign_b[0])
-
-    _conditional_invert(qc, dividend_reg, sign_a[0])
-    _conditional_invert(qc, divisor_reg, sign_b[0])
+        raise ValueError("Register size mismatch in div_unsigned")
 
     _unsigned_division(qc, dividend_reg, divisor_reg, quotient_reg, remainder_reg)
-
-    sign_q = QuantumRegister(1, name="sign_q")
-    qc.add_register(sign_q)
-    qc.cx(sign_a[0], sign_q[0])
-    qc.cx(sign_b[0], sign_q[0])
-
-    _conditional_invert(qc, quotient_reg, sign_q[0])
-    _conditional_invert(qc, remainder_reg, sign_a[0])
-
-    qc.cx(sign_b[0], sign_q[0])
-    qc.cx(sign_a[0], sign_q[0])
-
-    _conditional_invert(qc, divisor_reg, sign_b[0])
-    _conditional_invert(qc, dividend_reg, sign_a[0])
-
-    qc.cx(divisor_reg[n - 1], sign_b[0])
-    qc.cx(dividend_reg[n - 1], sign_a[0])
 
     return quotient_reg, remainder_reg
 

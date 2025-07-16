@@ -1,4 +1,4 @@
-"""Test suite for the `div` helper in q_arithmetics."""
+"""Test suite for the ``div_unsigned`` helper in :mod:`q_arithmetics`."""
 
 from qiskit.circuit import QuantumCircuit, QuantumRegister
 from qiskit.providers.basic_provider import BasicSimulator
@@ -20,7 +20,7 @@ def run_division(dividend: int, divisor: int):
     circuit.add_register(quotient_reg)
     circuit.add_register(remainder_reg)
 
-    qa.div(circuit, dividend_reg, divisor_reg, quotient_reg, remainder_reg)
+    qa.div_unsigned(circuit, dividend_reg, divisor_reg, quotient_reg, remainder_reg)
 
     qa.measure(circuit, quotient_reg)
     qa.measure(circuit, remainder_reg)

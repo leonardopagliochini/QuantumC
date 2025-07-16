@@ -20,7 +20,7 @@ from q_arithmetics import (
     subi,
     mul,
     muli,
-    div,
+    div_unsigned,
     divi,
     AerSimulator,
     BasicSimulator,
@@ -259,7 +259,7 @@ def _test_division():
             rem = QuantumRegister(n, name="r")
             qc.add_register(quot)
             qc.add_register(rem)
-            div(qc, dividend, divisor, quot, rem)
+            div_unsigned(qc, dividend, divisor, quot, rem)
             measure(qc, quot)
             measure(qc, rem)
             res = _run_circuit(qc)

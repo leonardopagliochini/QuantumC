@@ -8,7 +8,7 @@ def build_division_circuit(dividend: int, divisor: int) -> QuantumCircuit:
     """Create a circuit dividing ``dividend`` by ``divisor``.
 
     Registers for dividend and divisor are initialized with classical values and
-    passed to :func:`q_arithmetics.div`. The quotient and remainder registers are
+    passed to :func:`q_arithmetics.div_unsigned`. The quotient and remainder registers are
     instantiated beforehand and populated by the function.
 
     Parameters
@@ -36,7 +36,7 @@ def build_division_circuit(dividend: int, divisor: int) -> QuantumCircuit:
     circuit.add_register(quotient_reg)
     circuit.add_register(remainder_reg)
 
-    qa.div(circuit, dividend_reg, divisor_reg, quotient_reg, remainder_reg)
+    qa.div_unsigned(circuit, dividend_reg, divisor_reg, quotient_reg, remainder_reg)
 
     qa.measure(circuit, quotient_reg)
     qa.measure(circuit, remainder_reg)
