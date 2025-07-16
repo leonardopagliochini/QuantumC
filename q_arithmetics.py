@@ -365,62 +365,6 @@ def muli(qc, a_reg, c, n_output_bits=None):
     return out_reg
 
 
-def _divu_immediate(qc, a_reg, divisor, n_output_bits=None, a_val=None):
-    """Divide ``a_reg`` by unsigned integer ``divisor`` and return the quotient."""
-
-    if divisor == 0:
-        raise ValueError("Division by zero is not allowed.")
-
-    n = len(a_reg)
-    if n_output_bits is None:
-        n_output_bits = n
-
-    existing = {reg.name for reg in qc.qregs}
-    idx = 0
-    while f"quotu{idx}" in existing:
-        idx += 1
-    qout = QuantumRegister(n_output_bits, name=f"quotu{idx}")
-    qc.add_register(qout)
-
-    if a_val is not None:
-        quotient = (a_val // divisor) % (1 << n_output_bits)
-        for i in range(n_output_bits):
-            if (quotient >> i) & 1:
-                qc.x(qout[i])
-        return qout
-
-    # Remainder register (initialised to 0) and sign ancilla
-    rem = QuantumRegister(n, name=f"rem{idx}")
-    qc.add_register(rem)
-    sign = QuantumRegister(1, name=f"sign{idx}")
-    qc.add_register(sign)
-
-    # Perform the restoring division algorithm
-    for i in reversed(range(n_output_bits)):
-        # Left shift remainder and bring in next dividend bit
-        for j in reversed(range(1, n)):
-            qc.swap(rem[j], rem[j - 1])
-        if i < n:
-            qc.swap(rem[0], a_reg[i])
-
-        # Subtract divisor from remainder
-        addi_in_place(qc, rem, -divisor)
-
-        # Capture sign bit (1 if negative)
-        qc.cx(rem[n - 1], sign[0])
-
-        # Restore remainder if subtraction underflowed
-        _controlled_addi_in_place(qc, rem, divisor, sign[0])
-
-        # Quotient bit is 1 when sign bit is 0
-        qc.x(qout[i])
-        qc.cx(sign[0], qout[i])
-
-        # Reset sign ancilla for next iteration
-        qc.cx(rem[n - 1], sign[0])
-
-    return qout
-
 
 def divu(qc, a_reg, b_reg, n_output_bits=None, a_val=None, b_val=None):
     """Divide unsigned ``a_reg`` by unsigned ``b_reg`` and return the quotient."""
@@ -493,9 +437,50 @@ def divui(qc, a_reg, divisor, n_output_bits=None, a_val=None):
             ``divisor``.
     """
 
-    # Delegate to the immediate implementation used by the previous ``divu``
-    # helper which assumes the divisor is a classical value.
-    return _divu_immediate(qc, a_reg, divisor, n_output_bits=n_output_bits, a_val=a_val)
+    if divisor == 0:
+        raise ValueError("Division by zero is not allowed.")
+
+    n = len(a_reg)
+    if n_output_bits is None:
+        n_output_bits = n
+
+    existing = {reg.name for reg in qc.qregs}
+    idx = 0
+    while f"quotu{idx}" in existing:
+        idx += 1
+    qout = QuantumRegister(n_output_bits, name=f"quotu{idx}")
+    qc.add_register(qout)
+
+    if a_val is not None:
+        quotient = (a_val // divisor) % (1 << n_output_bits)
+        for i in range(n_output_bits):
+            if (quotient >> i) & 1:
+                qc.x(qout[i])
+        return qout
+
+    rem = QuantumRegister(n, name=f"rem{idx}")
+    qc.add_register(rem)
+    sign = QuantumRegister(1, name=f"sign{idx}")
+    qc.add_register(sign)
+
+    for i in reversed(range(n_output_bits)):
+        for j in reversed(range(1, n)):
+            qc.swap(rem[j], rem[j - 1])
+        if i < n:
+            qc.swap(rem[0], a_reg[i])
+
+        addi_in_place(qc, rem, -divisor)
+
+        qc.cx(rem[n - 1], sign[0])
+
+        _controlled_addi_in_place(qc, rem, divisor, sign[0])
+
+        qc.x(qout[i])
+        qc.cx(sign[0], qout[i])
+
+        qc.cx(rem[n - 1], sign[0])
+
+    return qout
 
 
 def _controlled_addi_in_place(qc, qreg, value, control):
