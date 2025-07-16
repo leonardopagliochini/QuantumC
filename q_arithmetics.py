@@ -387,6 +387,37 @@ def divu(qc, a_reg, divisor, n_output_bits=None, a_val=None):
         for i in range(n_output_bits):
             if (quotient >> i) & 1:
                 qc.x(qout[i])
+        return qout
+
+    # Remainder register (initialised to 0) and sign ancilla
+    rem = QuantumRegister(n, name=f"rem{idx}")
+    qc.add_register(rem)
+    sign = QuantumRegister(1, name=f"sign{idx}")
+    qc.add_register(sign)
+
+    # Perform the restoring division algorithm
+    for i in reversed(range(n_output_bits)):
+        # Left shift remainder and bring in next dividend bit
+        for j in reversed(range(1, n)):
+            qc.swap(rem[j], rem[j - 1])
+        if i < n:
+            qc.swap(rem[0], a_reg[i])
+
+        # Subtract divisor from remainder
+        addi_in_place(qc, rem, -divisor)
+
+        # Capture sign bit (1 if negative)
+        qc.cx(rem[n - 1], sign[0])
+
+        # Restore remainder if subtraction underflowed
+        _controlled_addi_in_place(qc, rem, divisor, sign[0])
+
+        # Quotient bit is 1 when sign bit is 0
+        qc.x(qout[i])
+        qc.cx(sign[0], qout[i])
+
+        # Reset sign ancilla for next iteration
+        qc.cx(rem[n - 1], sign[0])
 
     return qout
 
