@@ -365,7 +365,7 @@ def muli(qc, a_reg, c, n_output_bits=None):
     return out_reg
 
 
-def divu(qc, a_reg, divisor, n_output_bits=None, a_val=None):
+def _divu_immediate(qc, a_reg, divisor, n_output_bits=None, a_val=None):
     """Divide ``a_reg`` by unsigned integer ``divisor`` and return the quotient."""
 
     if divisor == 0:
@@ -422,6 +422,56 @@ def divu(qc, a_reg, divisor, n_output_bits=None, a_val=None):
     return qout
 
 
+def divu(qc, a_reg, b_reg, n_output_bits=None, a_val=None, b_val=None):
+    """Divide unsigned ``a_reg`` by unsigned ``b_reg`` and return the quotient."""
+
+    if b_val is not None and b_val == 0:
+        raise ValueError("Division by zero is not allowed.")
+
+    n = len(a_reg)
+    assert len(b_reg) == n
+    if n_output_bits is None:
+        n_output_bits = n
+
+    existing = {reg.name for reg in qc.qregs}
+    idx = 0
+    while f"quotu{idx}" in existing:
+        idx += 1
+    qout = QuantumRegister(n_output_bits, name=f"quotu{idx}")
+    qc.add_register(qout)
+
+    if a_val is not None and b_val is not None:
+        quotient = (a_val // b_val) % (1 << n_output_bits)
+        for i in range(n_output_bits):
+            if (quotient >> i) & 1:
+                qc.x(qout[i])
+        return qout
+
+    rem = QuantumRegister(n, name=f"rem{idx}")
+    qc.add_register(rem)
+    sign = QuantumRegister(1, name=f"sign{idx}")
+    qc.add_register(sign)
+
+    for i in reversed(range(n_output_bits)):
+        for j in reversed(range(1, n)):
+            qc.swap(rem[j], rem[j - 1])
+        if i < n:
+            qc.swap(rem[0], a_reg[i])
+
+        _sub_in_place(qc, rem, b_reg)
+
+        qc.cx(rem[n - 1], sign[0])
+
+        _controlled_add_in_place(qc, rem, b_reg, sign[0])
+
+        qc.x(qout[i])
+        qc.cx(sign[0], qout[i])
+
+        qc.cx(rem[n - 1], sign[0])
+
+    return qout
+
+
 def divui(qc, a_reg, divisor, n_output_bits=None, a_val=None):
     """Divide ``a_reg`` by unsigned integer ``divisor`` and return the quotient.
 
@@ -443,9 +493,9 @@ def divui(qc, a_reg, divisor, n_output_bits=None, a_val=None):
             ``divisor``.
     """
 
-    # Delegate to ``divu`` since the current implementation already assumes an
-    # immediate divisor.
-    return divu(qc, a_reg, divisor, n_output_bits=n_output_bits, a_val=a_val)
+    # Delegate to the immediate implementation used by the previous ``divu``
+    # helper which assumes the divisor is a classical value.
+    return _divu_immediate(qc, a_reg, divisor, n_output_bits=n_output_bits, a_val=a_val)
 
 
 def _controlled_addi_in_place(qc, qreg, value, control):
@@ -470,6 +520,39 @@ def _controlled_addi_in_place(qc, qreg, value, control):
             qc.cp(angle, control, qreg[j])
 
     qc.append(QFT(n, do_swaps=False).inverse(), qreg)
+
+
+def _sub_in_place(qc, a_reg, b_reg):
+    """Subtract ``b_reg`` from ``a_reg`` in place."""
+
+    n = len(a_reg)
+    assert len(b_reg) == n
+
+    qc.append(QFT(n, do_swaps=False), a_reg)
+    for i in range(n):
+        for j in range(n):
+            if j <= i:
+                angle = -(2 * np.pi) / (2 ** (i - j + 1))
+                qc.cp(angle, b_reg[j], a_reg[i])
+    qc.append(QFT(n, do_swaps=False).inverse(), a_reg)
+    return a_reg
+
+
+def _controlled_add_in_place(qc, a_reg, b_reg, control):
+    """Add ``b_reg`` to ``a_reg`` controlled by ``control``."""
+
+    n = len(a_reg)
+    assert len(b_reg) == n
+
+    qc.append(QFT(n, do_swaps=False), a_reg)
+    for i in range(n):
+        for j in range(n):
+            if j <= i:
+                angle = 2 * np.pi / (2 ** (i - j + 1))
+                gate = PhaseGate(angle).control(2)
+                qc.append(gate, [control, b_reg[j], a_reg[i]])
+    qc.append(QFT(n, do_swaps=False).inverse(), a_reg)
+    return a_reg
 
 
 def equal(qc, a_reg, b_reg):
