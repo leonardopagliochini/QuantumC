@@ -28,9 +28,11 @@ def main():
             out = mul(qc, ar, br)
             measure(qc, out)
             res_bits, res = tu.run_circuit(qc)[f"{out.name}_measure"]
-            exp = tu.twos(a * b, n)
-            exp_bin = tu.to_binary(exp, n)
-            rows.append(("mul", a, a_bin, b, b_bin, exp, exp_bin, res, res_bits, res == exp))
+            exp = a * b
+            overflow = exp < min_val or exp > max_val
+            exp_bin = tu.to_binary(exp, n) if not overflow else "overflow"
+            ok = res == exp
+            rows.append(("mul", a, a_bin, b, b_bin, exp, exp_bin, res, res_bits, ok))
     tu.print_table(rows, csv_path="test_log/test_mul.csv")
 
 

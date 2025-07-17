@@ -54,10 +54,12 @@ def main():
             q_bits, q_val = values[f"{quot.name}_measure"]
             r_bits, r_val = values[f"{rem.name}_measure"]
 
-            exp_q = tu.twos(int(a / b), n)
-            exp_q_bin = tu.to_binary(exp_q, n)
-            exp_r = tu.twos(a - exp_q * b, n)
-            exp_r_bin = tu.to_binary(exp_r, n)
+            exp_q = int(a / b)
+            exp_r = a - exp_q * b
+            overflow_q = exp_q < min_val or exp_q > max_val
+            overflow_r = exp_r < min_val or exp_r > max_val
+            exp_q_bin = tu.to_binary(exp_q, n) if not overflow_q else "overflow"
+            exp_r_bin = tu.to_binary(exp_r, n) if not overflow_r else "overflow"
 
             ok = (q_val == exp_q) and (r_val == exp_r)
 
