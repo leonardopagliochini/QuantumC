@@ -274,6 +274,44 @@ def subi(qc, qreg, b):
     """
     return addi(qc, qreg, -b)
 
+def twos_to_sign_magnitude(qc, qreg):
+    """Convert ``qreg`` from two's complement to sign+magnitude representation.
+
+    A new 1-qubit register is appended to ``qc`` storing the sign bit.  ``qreg``
+    is modified in place to hold the absolute value of the original integer.
+
+    Returns
+    -------
+    QuantumRegister
+        The newly created sign register.
+    """
+
+    n = len(qreg)
+    existing = {reg.name for reg in qc.qregs}
+    idx = 0
+    while f"sign{idx}" in existing:
+        idx += 1
+    sign = QuantumRegister(1, name=f"sign{idx}")
+    qc.add_register(sign)
+
+    qc.cx(qreg[n - 1], sign[0])
+    _controlled_invert_in_place(qc, qreg, sign[0])
+    return sign
+
+
+def sign_magnitude_to_twos(qc, mag_reg, sign_reg):
+    """Convert sign+magnitude representation back to two's complement."""
+
+    _controlled_invert_in_place(qc, mag_reg, sign_reg[0])
+    return mag_reg
+
+
+def abs_val(qc, qreg):
+    """Compute the absolute value of ``qreg`` in place and return it."""
+
+    twos_to_sign_magnitude(qc, qreg)
+    return qreg
+
 def mul(qc, a_reg, b_reg, a_val=None, b_val=None):
     """
     Multiply two quantum registers using QFT-based logic.
@@ -538,6 +576,15 @@ def _controlled_add_in_place(qc, a_reg, b_reg, control):
                 qc.append(gate, [control, b_reg[j], a_reg[i]])
     qc.append(QFT(n, do_swaps=False).inverse(), a_reg)
     return a_reg
+
+
+def _controlled_invert_in_place(qc, qreg, control):
+    """Negate ``qreg`` conditioned on ``control`` being ``|1>``."""
+
+    for qubit in qreg:
+        qc.cx(control, qubit)
+    _controlled_addi_in_place(qc, qreg, 1, control)
+    return qreg
 
 
 def equal(qc, a_reg, b_reg):
