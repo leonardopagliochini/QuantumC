@@ -25,13 +25,13 @@ def main():
             b_bin = tu.to_binary(b, n)
             ar = initialize_variable(qc, a, "a")
             br = initialize_variable(qc, b, "b")
-            out = add(qc, ar, br)
+            out = add(qc, ar, br, a_val=a, b_val=b)
             measure(qc, out)
             res_bits, res = tu.run_circuit(qc)[f"{out.name}_measure"]
             exp = a + b
-            overflow = exp < min_val or exp > max_val
-            exp_bin = tu.to_binary(exp, n) if not overflow else "overflow"
-            ok = res == exp
+            exp_twos = tu.twos(exp, n)
+            exp_bin = tu.to_binary(exp_twos, n)
+            ok = res == exp_twos
             rows.append(("add", a, a_bin, b, b_bin, exp, exp_bin, res, res_bits, ok))
     tu.print_table(rows, csv_path="test_log/test_add.csv")
 

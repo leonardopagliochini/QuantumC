@@ -3,7 +3,7 @@
 import csv
 import os
 from qiskit import transpile
-from q_arithmetics import AerSimulator, BasicSimulator, int_to_twos_complement
+from q_arithmetics import AerSimulator, QasmSimulatorPy, int_to_twos_complement
 
 
 def range_signed(n):
@@ -44,7 +44,7 @@ def run_circuit(qc, signed=True):
         backend = AerSimulator(method="matrix_product_state")
         compiled = transpile(qc, backend)
     else:
-        backend = BasicSimulator()
+        backend = QasmSimulatorPy()
         compiled = transpile(qc, backend)
     result = backend.run(compiled, shots=1).result()
     counts = result.get_counts()

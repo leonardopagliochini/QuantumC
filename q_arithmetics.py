@@ -3,7 +3,8 @@
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
 from qiskit.circuit.library.standard_gates import PhaseGate
 from qiskit.circuit.library import QFT, RGQFTMultiplier
-from qiskit.providers.basic_provider import BasicSimulator
+from qiskit.providers.basicaer import QasmSimulatorPy
+import warnings
 import numpy as np
 try:
     from qiskit_aer import AerSimulator
@@ -11,6 +12,17 @@ except Exception:  # pragma: no cover - optional dependency
     AerSimulator = None
 
 NUMBER_OF_BITS = 4
+
+
+def _check_overflow(value, n, op_name):
+    """Emit a warning if ``value`` does not fit in ``n`` bits two's complement."""
+    min_val = -(1 << (n - 1))
+    max_val = (1 << (n - 1)) - 1
+    if value < min_val or value > max_val:
+        warnings.warn(
+            f"Overflow in {op_name}; result truncated to fit {n} bits",
+            RuntimeWarning,
+        )
 
 def set_number_of_bits(n):
     """
@@ -79,7 +91,7 @@ def initialize_variable(qc, value, register_name=None):
 
     return new_qreg
 
-def add_in_place(qc, a_reg, b_reg):
+def add_in_place(qc, a_reg, b_reg, a_val=None, b_val=None):
     """
     Add two quantum registers using a quantum circuit.
 
@@ -104,9 +116,13 @@ def add_in_place(qc, a_reg, b_reg):
 
     # Apply inverse QFT
     qc.append(QFT(NUMBER_OF_BITS, do_swaps=False).inverse(), a_reg)
+
+    if a_val is not None and b_val is not None:
+        _check_overflow(a_val + b_val, NUMBER_OF_BITS, "add_in_place")
+
     return a_reg
 
-def add(qc, a_reg, b_reg):
+def add(qc, a_reg, b_reg, a_val=None, b_val=None):
     n = len(a_reg)
 
     # Generate a unique name
@@ -133,11 +149,14 @@ def add(qc, a_reg, b_reg):
     # Inverse QFT
     qc.append(QFT(n, do_swaps=False).inverse(), s_reg)
 
+    if a_val is not None and b_val is not None:
+        _check_overflow(a_val + b_val, n, "add")
+
     return s_reg
 
 
 
-def addi_in_place(qc, qreg, b):
+def addi_in_place(qc, qreg, b, a_val=None):
     """
     Add a classical integer to a quantum register using a quantum circuit.
 
@@ -165,6 +184,10 @@ def addi_in_place(qc, qreg, b):
 
     # Apply inverse QFT
     qc.append(QFT(num_qubits=NUMBER_OF_BITS, do_swaps=False).inverse(), qreg)
+
+    if a_val is not None:
+        _check_overflow(a_val + b, NUMBER_OF_BITS, "addi_in_place")
+
     return qreg
 
 def invert(qc, qreg):
@@ -188,7 +211,7 @@ def invert(qc, qreg):
 
     return qreg
 
-def addi(qc, a_reg, b):
+def addi(qc, a_reg, b, a_val=None):
     """
     Add a classical integer b to a quantum register a_reg,
     storing the result in a new quantum register (non-in-place).
@@ -232,11 +255,14 @@ def addi(qc, a_reg, b):
     # Inverse QFT
     qc.append(QFT(n, do_swaps=False).inverse(), s_reg)
 
+    if a_val is not None:
+        _check_overflow(a_val + b, n, "addi")
+
     return s_reg
 
 
 
-def sub(qc, a_reg, b_reg):
+def sub(qc, a_reg, b_reg, a_val=None, b_val=None):
     """
     Subtract the contents of b_reg from a_reg using two's complement:
     a - b = a + (-b)
@@ -253,13 +279,17 @@ def sub(qc, a_reg, b_reg):
     invert(qc, b_reg)
 
     # Add -b to a
-    result = add(qc, a_reg, b_reg)
+    result = add(qc, a_reg, b_reg, a_val=a_val, b_val=-b_val if b_val is not None else None)
 
     # Invert the sign of b back to its original value
     invert(qc, b_reg)
+
+    if a_val is not None and b_val is not None:
+        _check_overflow(a_val - b_val, len(a_reg), "sub")
+
     return result
 
-def subi(qc, qreg, b):
+def subi(qc, qreg, b, a_val=None):
     """
     Subtract a classical integer from a quantum register using two's complement:
     a - b = a + (-b)
@@ -272,7 +302,7 @@ def subi(qc, qreg, b):
     Returns:
         QuantumRegister: The quantum register containing the result.
     """
-    return addi(qc, qreg, -b)
+    return addi(qc, qreg, -b, a_val=a_val)
 
 def twos_to_sign_magnitude(qc, qreg):
     """Convert ``qreg`` from two's complement to sign+magnitude representation.
@@ -354,9 +384,11 @@ def mul(qc, a_reg, b_reg, a_val=None, b_val=None):
         if (a_val < 0) ^ (b_val < 0):  # segni opposti
             invert(qc, out_reg)
 
+        _check_overflow(a_val * b_val, n, "mul")
+
     return out_reg
 
-def muli(qc, a_reg, c, n_output_bits=None):
+def muli(qc, a_reg, c, n_output_bits=None, a_val=None):
     """
     Multiply a quantum register by a classical constant c (can be negative).
     Stores result in a new register of size n_output_bits (default: len(a_reg)).
@@ -399,6 +431,9 @@ def muli(qc, a_reg, c, n_output_bits=None):
     # Sign correction
     if c < 0:
         invert(qc, out_reg)
+
+    if a_val is not None:
+        _check_overflow(a_val * c, n_output_bits, "muli")
 
     return out_reg
 
@@ -848,7 +883,7 @@ def simulate(qc, shots=1024):
         backend = AerSimulator(method="matrix_product_state")
         transpiled = transpile(qc, backend)
     else:
-        backend = BasicSimulator()
+        backend = QasmSimulatorPy()
         transpiled = transpile(qc, backend)
     job = backend.run(transpiled, shots=shots)
     counts = job.result().get_counts()
