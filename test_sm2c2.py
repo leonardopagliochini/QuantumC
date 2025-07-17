@@ -1,6 +1,12 @@
 from qiskit import QuantumCircuit
 from qiskit.circuit import QuantumRegister
-from q_arithmetics import set_number_of_bits, initialize_variable, measure, measure_single, sign_magnitude_to_twos
+from q_arithmetics import (
+    set_number_of_bits,
+    initialize_variable,
+    measure,
+    measure_single,
+    sign_magnitude_to_twos,
+)
 import utils_test as tu
 
 TOTAL_QUBITS = 8
@@ -9,6 +15,18 @@ TOTAL_QUBITS = 8
 def main():
     n = TOTAL_QUBITS // 2
     rows = []
+    headers = [
+        "op",
+        "input_dec",
+        "input_mag_bin",
+        "sign_bit",
+        "expected_dec",
+        "expected_bin",
+        "measured_dec",
+        "measured_bin",
+        "measured_sign",
+        "ok",
+    ]
     vals = list(tu.range_signed(n))
     total = len(vals)
     min_val = vals[0]
@@ -43,42 +61,25 @@ def main():
         out_bits, out_val = values[f"{mag_reg.name}_measure"]
         sign_val = values[f"{sign.name}_measure"][1]
 
-        exp_sign = sign_bit
-        exp_mod = magnitude
-        exp_mod_bin = tu.to_binary(exp_mod, n)
+        exp_val = tu.twos(a, n)
+        exp_bin = tu.to_binary(exp_val, n)
 
-        meas_sign = sign_val
-        meas_mod = abs(out_val)
-
-        ok = (meas_sign == exp_sign) and (meas_mod == exp_mod)
+        ok = (out_val == exp_val) and (sign_val == sign_bit)
 
         rows.append(
             (
                 "sm2c2",
                 a,
                 mag_bin,
-                exp_sign,
-                meas_sign,
-                exp_mod,
-                exp_mod_bin,
-                meas_mod,
-                tu.to_binary(meas_mod, n),
+                sign_bit,
+                exp_val,
+                exp_bin,
+                out_val,
+                out_bits,
+                sign_val,
                 ok,
             )
         )
-
-    headers = [
-        "op",
-        "input_dec",
-        "input_mag_bin",
-        "expected_sign",
-        "measured_sign",
-        "expected_mod_dec",
-        "expected_mod_bin",
-        "measured_mod_dec",
-        "measured_mod_bin",
-        "ok",
-    ]
 
     tu.print_table(rows, csv_path="test_log/test_sm2c2.csv", headers=headers)
 
