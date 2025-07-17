@@ -26,9 +26,9 @@ def main():
             a_bin = tu.to_binary_unsigned(a, n)
             b_bin = tu.to_binary_unsigned(b, n)
             ar = initialize_variable(qc, a, "a")
-            out = divui(qc, ar, b, a_val=a)
-            measure(qc, out)
-            res_bits, res = tu.run_circuit(qc, signed=False)[f"{out.name}_measure"]
+            quot, _ = divui(qc, ar, b, a_val=a)
+            measure(qc, quot)
+            res_bits, res = tu.run_circuit(qc, signed=False)[f"{quot.name}_measure"]
             exp = a // b
             exp_bin = tu.to_binary_unsigned(exp, n)
             rows.append(("divui", a, a_bin, b, b_bin, exp, exp_bin, res, res_bits, res == exp))
