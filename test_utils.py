@@ -66,53 +66,46 @@ def run_circuit(qc, signed=True):
     return values
 
 
-def print_table(rows, csv_path=None):
-    """Print ``rows`` and optionally write them to ``csv_path``."""
-    print(
-        "| op | a_dec | a_bin | b_dec | b_bin | expected_dec | expected_bin | "
-        "measured_dec | measured_bin | ok |"
-    )
+def print_table(rows, csv_path=None, headers=None):
+    """Print ``rows`` and optionally write them to ``csv_path``.
+
+    ``rows`` should be a sequence of iterables containing the values to print.
+    ``headers`` can be provided to customise the column names.  If omitted,
+    the default 10-column format is used for backwards compatibility.
+    """
+
+    default_headers = [
+        "op",
+        "a_dec",
+        "a_bin",
+        "b_dec",
+        "b_bin",
+        "expected_dec",
+        "expected_bin",
+        "measured_dec",
+        "measured_bin",
+        "ok",
+    ]
+    if headers is None:
+        headers = default_headers
+
+    print("| " + " | ".join(headers) + " |")
+
     writer = None
     if csv_path:
         os.makedirs(os.path.dirname(csv_path), exist_ok=True)
         file = open(csv_path, "w", newline="")
         writer = csv.writer(file)
-        writer.writerow(
-            [
-                "op",
-                "a_dec",
-                "a_bin",
-                "b_dec",
-                "b_bin",
-                "expected_dec",
-                "expected_bin",
-                "measured_dec",
-                "measured_bin",
-                "ok",
-            ]
-        )
-    for op, a, a_bin, b, b_bin, exp, exp_bin, res, res_bin, ok in rows:
-        print(
-            f"| {op} | {a} | {a_bin} | {b} | {b_bin} | {exp} | {exp_bin} | "
-            f"{res} | {res_bin} | {ok} |"
-        )
+        writer.writerow(headers)
+
+    for row in rows:
+        print("| " + " | ".join(str(x) for x in row) + " |")
         if writer:
-            writer.writerow(
-                [
-                    op,
-                    a,
-                    a_bin,
-                    b,
-                    b_bin,
-                    exp,
-                    exp_bin,
-                    res,
-                    res_bin,
-                    ok,
-                ]
-            )
+            writer.writerow(list(row))
+
     if writer:
         file.close()
+
     if any(not r[-1] for r in rows):
         print("Result check: FAIL")
     else:
