@@ -405,7 +405,11 @@ def muli(qc, a_reg, c, n_output_bits=None):
 
 
 def divu(qc, a_reg, b_reg, n_output_bits=None, a_val=None, b_val=None):
-    """Divide unsigned ``a_reg`` by unsigned ``b_reg`` and return the quotient."""
+    """Divide unsigned ``a_reg`` by unsigned ``b_reg`` using restoring division.
+
+    Returns the quotient and remainder registers. ``a_reg`` and ``b_reg``
+    remain unchanged.
+    """
 
     if b_val is not None and b_val == 0:
         raise ValueError("Division by zero is not allowed.")
@@ -422,17 +426,24 @@ def divu(qc, a_reg, b_reg, n_output_bits=None, a_val=None, b_val=None):
     qout = QuantumRegister(n_output_bits, name=f"quotu{idx}")
     qc.add_register(qout)
 
+    rem = QuantumRegister(n, name=f"rem{idx}")
+    qc.add_register(rem)
+
+    sign = QuantumRegister(1, name=f"sign{idx}")
+    qc.add_register(sign)
+
     if a_val is not None and b_val is not None:
+        if b_val == 0:
+            raise ValueError("Division by zero is not allowed.")
         quotient = (a_val // b_val) % (1 << n_output_bits)
+        remainder = a_val % b_val
         for i in range(n_output_bits):
             if (quotient >> i) & 1:
                 qc.x(qout[i])
-        return qout
-
-    rem = QuantumRegister(n, name=f"rem{idx}")
-    qc.add_register(rem)
-    sign = QuantumRegister(1, name=f"sign{idx}")
-    qc.add_register(sign)
+        for i in range(n):
+            if (remainder >> i) & 1:
+                qc.x(rem[i])
+        return qout, rem
 
     for i in reversed(range(n_output_bits)):
         for j in reversed(range(1, n)):
@@ -449,17 +460,16 @@ def divu(qc, a_reg, b_reg, n_output_bits=None, a_val=None, b_val=None):
         qc.x(qout[i])
         qc.cx(sign[0], qout[i])
 
-        qc.cx(rem[n - 1], sign[0])
+        qc.cx(qout[i], sign[0])
+        qc.x(sign[0])
 
-    return qout
+    return qout, rem
 
 
 def divui(qc, a_reg, divisor, n_output_bits=None, a_val=None):
-    """Divide ``a_reg`` by unsigned integer ``divisor`` and return the quotient.
+    """Divide ``a_reg`` by the classical ``divisor`` using restoring division.
 
-    ``divui`` behaves like :func:`divu` but is provided for API symmetry with
-    other immediate operations such as :func:`addi` or :func:`muli`.
-    The ``divisor`` is a classical value known at compile time.
+    Returns the quotient and remainder registers.
 
     Args:
         qc (QuantumCircuit): Circuit to modify.
@@ -489,17 +499,22 @@ def divui(qc, a_reg, divisor, n_output_bits=None, a_val=None):
     qout = QuantumRegister(n_output_bits, name=f"quotu{idx}")
     qc.add_register(qout)
 
+    rem = QuantumRegister(n, name=f"rem{idx}")
+    qc.add_register(rem)
+
+    sign = QuantumRegister(1, name=f"sign{idx}")
+    qc.add_register(sign)
+
     if a_val is not None:
         quotient = (a_val // divisor) % (1 << n_output_bits)
+        remainder = a_val % divisor
         for i in range(n_output_bits):
             if (quotient >> i) & 1:
                 qc.x(qout[i])
-        return qout
-
-    rem = QuantumRegister(n, name=f"rem{idx}")
-    qc.add_register(rem)
-    sign = QuantumRegister(1, name=f"sign{idx}")
-    qc.add_register(sign)
+        for i in range(n):
+            if (remainder >> i) & 1:
+                qc.x(rem[i])
+        return qout, rem
 
     for i in reversed(range(n_output_bits)):
         for j in reversed(range(1, n)):
@@ -516,9 +531,10 @@ def divui(qc, a_reg, divisor, n_output_bits=None, a_val=None):
         qc.x(qout[i])
         qc.cx(sign[0], qout[i])
 
-        qc.cx(rem[n - 1], sign[0])
+        qc.cx(qout[i], sign[0])
+        qc.x(sign[0])
 
-    return qout
+    return qout, rem
 
 
 def _controlled_addi_in_place(qc, qreg, value, control):
