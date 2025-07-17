@@ -5,12 +5,40 @@ from qiskit.circuit.library.standard_gates import PhaseGate
 from qiskit.circuit.library import QFT, RGQFTMultiplier
 from qiskit.providers.basic_provider import BasicSimulator
 import numpy as np
+import warnings
 try:
     from qiskit_aer import AerSimulator
 except Exception:  # pragma: no cover - optional dependency
     AerSimulator = None
 
 NUMBER_OF_BITS = 4
+
+# Mapping from QuantumRegister objects to known classical integer values
+_CLASSICAL_MAP = {}
+
+def _set_value(qreg, value):
+    _CLASSICAL_MAP[qreg] = value
+
+def _get_value(qreg):
+    return _CLASSICAL_MAP.get(qreg)
+
+
+def _twos(value, n):
+    """Return the ``n``-bit two's complement representation of ``value`` as an int."""
+    value %= 1 << n
+    if value >= 1 << (n - 1):
+        value -= 1 << n
+    return value
+
+
+def _check_overflow(value, n):
+    """Emit a warning if ``value`` does not fit in ``n``-bit two's complement."""
+    min_val = -(1 << (n - 1))
+    max_val = (1 << (n - 1)) - 1
+    if value < min_val or value > max_val:
+        warnings.warn("Overflow occurred during arithmetic operation", RuntimeWarning)
+        return True
+    return False
 
 def set_number_of_bits(n):
     """
@@ -70,6 +98,8 @@ def initialize_variable(qc, value, register_name=None):
 
     new_qreg = QuantumRegister(NUMBER_OF_BITS, name=register_name)
     qc.add_register(new_qreg)
+    # Store the classical value for overflow tracking
+    _set_value(new_qreg, value)
 
     binary_value = int_to_twos_complement(value)
 
@@ -104,6 +134,15 @@ def add_in_place(qc, a_reg, b_reg):
 
     # Apply inverse QFT
     qc.append(QFT(NUMBER_OF_BITS, do_swaps=False).inverse(), a_reg)
+
+    # Track classical value and overflow
+    a_val = _get_value(a_reg)
+    b_val = _get_value(b_reg)
+    if a_val is not None and b_val is not None:
+        result = a_val + b_val
+        _check_overflow(result, len(a_reg))
+        _set_value(a_reg, _twos(result, len(a_reg)))
+
     return a_reg
 
 def add(qc, a_reg, b_reg):
@@ -132,6 +171,14 @@ def add(qc, a_reg, b_reg):
 
     # Inverse QFT
     qc.append(QFT(n, do_swaps=False).inverse(), s_reg)
+
+    # Track classical value and overflow if inputs are known
+    a_val = _get_value(a_reg)
+    b_val = _get_value(b_reg)
+    if a_val is not None and b_val is not None:
+        result = a_val + b_val
+        _check_overflow(result, n)
+        _set_value(s_reg, _twos(result, n))
 
     return s_reg
 
@@ -165,6 +212,13 @@ def addi_in_place(qc, qreg, b):
 
     # Apply inverse QFT
     qc.append(QFT(num_qubits=NUMBER_OF_BITS, do_swaps=False).inverse(), qreg)
+
+    q_val = _get_value(qreg)
+    if q_val is not None:
+        result = q_val + b
+        _check_overflow(result, len(qreg))
+        _set_value(qreg, _twos(result, len(qreg)))
+
     return qreg
 
 def invert(qc, qreg):
@@ -185,6 +239,12 @@ def invert(qc, qreg):
 
     # Step 2: Add 1 using addi()
     addi_in_place(qc, qreg, 1)
+
+    q_val = _get_value(qreg)
+    if q_val is not None:
+        result = -q_val
+        _check_overflow(result, len(qreg))
+        _set_value(qreg, _twos(result, len(qreg)))
 
     return qreg
 
@@ -232,6 +292,12 @@ def addi(qc, a_reg, b):
     # Inverse QFT
     qc.append(QFT(n, do_swaps=False).inverse(), s_reg)
 
+    a_val = _get_value(a_reg)
+    if a_val is not None:
+        result = a_val + b
+        _check_overflow(result, n)
+        _set_value(s_reg, _twos(result, n))
+
     return s_reg
 
 
@@ -249,6 +315,10 @@ def sub(qc, a_reg, b_reg):
     Returns:
         QuantumRegister: The register containing the result (in a_reg).
     """
+    # Keep track of classical values if available
+    a_val = _get_value(a_reg)
+    b_val = _get_value(b_reg)
+
     # Invert the sign of b (i.e., compute -b)
     invert(qc, b_reg)
 
@@ -257,6 +327,12 @@ def sub(qc, a_reg, b_reg):
 
     # Invert the sign of b back to its original value
     invert(qc, b_reg)
+
+    if a_val is not None and b_val is not None:
+        res_val = a_val - b_val
+        _check_overflow(res_val, len(a_reg))
+        _set_value(result, _twos(res_val, len(a_reg)))
+
     return result
 
 def subi(qc, qreg, b):
@@ -354,6 +430,19 @@ def mul(qc, a_reg, b_reg, a_val=None, b_val=None):
         if (a_val < 0) ^ (b_val < 0):  # segni opposti
             invert(qc, out_reg)
 
+    a_known = _get_value(a_reg)
+    b_known = _get_value(b_reg)
+    if a_known is not None and b_known is not None:
+        result = a_known * b_known
+        if a_val is None:
+            a_val = a_known
+        if b_val is None:
+            b_val = b_known
+        if (a_val < 0) ^ (b_val < 0):
+            result = -result
+        _check_overflow(result, n)
+        _set_value(out_reg, _twos(result, n))
+
     return out_reg
 
 def muli(qc, a_reg, c, n_output_bits=None):
@@ -399,6 +488,12 @@ def muli(qc, a_reg, c, n_output_bits=None):
     # Sign correction
     if c < 0:
         invert(qc, out_reg)
+
+    a_val = _get_value(a_reg)
+    if a_val is not None:
+        result = a_val * c
+        _check_overflow(result, n_output_bits)
+        _set_value(out_reg, _twos(result, n_output_bits))
 
     return out_reg
 
@@ -466,6 +561,28 @@ def divu(qc, a_reg, b_reg, n_output_bits=None):
         qc.cx(qout[i], sign[0])
         qc.x(sign[0])
 
+    a_val = _get_value(a_reg)
+    b_val = _get_value(b_reg)
+    if a_val is not None and b_val is not None:
+        if b_val == 0:
+            warnings.warn("Division by zero during simulation", RuntimeWarning)
+        else:
+            q_val = a_val // b_val
+            r_val = a_val % b_val
+            _check_overflow(q_val, n_output_bits)
+            _check_overflow(r_val, n)
+            _set_value(qout, _twos(q_val, n_output_bits))
+            _set_value(rem, _twos(r_val, n))
+
+    a_val = _get_value(a_reg)
+    if a_val is not None:
+        q_val = a_val // divisor
+        r_val = a_val % divisor
+        _check_overflow(q_val, n_output_bits)
+        _check_overflow(r_val, n)
+        _set_value(qout, _twos(q_val, n_output_bits))
+        _set_value(rem, _twos(r_val, n))
+
     return qout, rem
 
 
@@ -526,6 +643,14 @@ def divui(qc, a_reg, divisor, n_output_bits=None):
 
         qc.cx(qout[i], sign[0])
         qc.x(sign[0])
+    a_val = _get_value(a_reg)
+    if a_val is not None:
+        q_val = a_val // divisor
+        r_val = a_val % divisor
+        _check_overflow(q_val, n_output_bits)
+        _check_overflow(r_val, n)
+        _set_value(qout, _twos(q_val, n_output_bits))
+        _set_value(rem, _twos(r_val, n))
 
     return qout, rem
 
@@ -588,6 +713,19 @@ def div(qc, a_reg, b_reg, n_output_bits=None):
     sign_magnitude_to_twos(qc, b_reg, sign_b)
     qc.cx(b_reg[n - 1], sign_b[0])
 
+    a_val = _get_value(a_reg)
+    b_val = _get_value(b_reg)
+    if a_val is not None and b_val is not None:
+        if b_val == 0:
+            warnings.warn("Division by zero during simulation", RuntimeWarning)
+        else:
+            q_val = a_val // b_val
+            r_val = a_val % b_val
+            _check_overflow(q_val, n_output_bits)
+            _check_overflow(r_val, n)
+            _set_value(qout, _twos(q_val, n_output_bits))
+            _set_value(rem, _twos(r_val, n))
+
     return qout, rem
 
 
@@ -647,6 +785,18 @@ def divi(qc, a_reg, divisor, n_output_bits=None):
     # Optionally restore input (for reversibility)
     sign_magnitude_to_twos(qc, a_reg, sign_a)
     qc.cx(a_reg[n - 1], sign_a[0])
+
+    a_val = _get_value(a_reg)
+    if a_val is not None:
+        if divisor == 0:
+            warnings.warn("Division by zero during simulation", RuntimeWarning)
+        else:
+            q_val = a_val // divisor
+            r_val = a_val % divisor
+            _check_overflow(q_val, n_output_bits)
+            _check_overflow(r_val, n)
+            _set_value(qout, _twos(q_val, n_output_bits))
+            _set_value(rem, _twos(r_val, n))
 
     return qout, rem
 
