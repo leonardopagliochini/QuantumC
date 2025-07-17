@@ -1,7 +1,7 @@
 from qiskit import QuantumCircuit
 from qiskit.circuit import QuantumRegister
 from q_arithmetics import set_number_of_bits, initialize_variable, measure, measure_single, twos_to_sign_magnitude
-import test_utils as tu
+import utils_test as tu
 
 TOTAL_QUBITS = 8
 

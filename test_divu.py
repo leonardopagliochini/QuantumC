@@ -2,13 +2,11 @@
 
 from qiskit import QuantumCircuit
 from q_arithmetics import set_number_of_bits, initialize_variable, measure, divu
-import test_utils as tu
+import utils_test as tu
 
 TOTAL_QUBITS = 12
 
-
 def main():
-    """Run the divu test and print the result table."""
     n = TOTAL_QUBITS // 3
     rows = []
     vals = list(tu.range_unsigned(n - 1))
@@ -27,14 +25,13 @@ def main():
             b_bin = tu.to_binary_unsigned(b, n)
             ar = initialize_variable(qc, a, "a")
             br = initialize_variable(qc, b, "b")
-            quot, _ = divu(qc, ar, br, a_val=a, b_val=b)
+            quot, _ = divu(qc, ar, br)
             measure(qc, quot)
             res_bits, res = tu.run_circuit(qc, signed=False)[f"{quot.name}_measure"]
             exp = a // b
             exp_bin = tu.to_binary_unsigned(exp, n)
             rows.append(("divu", a, a_bin, b, b_bin, exp, exp_bin, res, res_bits, res == exp))
     tu.print_table(rows, csv_path="test_log/test_divu.csv")
-
 
 if __name__ == "__main__":
     main()

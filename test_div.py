@@ -1,6 +1,6 @@
 from qiskit import QuantumCircuit
 from q_arithmetics import set_number_of_bits, initialize_variable, measure, div
-import test_utils as tu
+import utils_test as tu
 
 TOTAL_QUBITS = 12
 
@@ -13,6 +13,7 @@ def main():
     min_val = vals[0]
     max_val = vals[-1]
     print(f"div: testing a and b in range {min_val}..{max_val}, {total} operations")
+    
     for a in vals:
         for b in vals:
             if b == 0:
@@ -24,12 +25,13 @@ def main():
             b_bin = tu.to_binary(b, n)
             ar = initialize_variable(qc, a, "a")
             br = initialize_variable(qc, b, "b")
-            quot, _ = div(qc, ar, br, a_val=a, b_val=b)
+            quot, _ = div(qc, ar, br)
             measure(qc, quot)
             res_bits, res = tu.run_circuit(qc)[f"{quot.name}_measure"]
             exp = tu.twos(int(a / b), n)
             exp_bin = tu.to_binary(exp, n)
             rows.append(("div", a, a_bin, b, b_bin, exp, exp_bin, res, res_bits, res == exp))
+
     tu.print_table(rows, csv_path="test_log/test_div.csv")
 
 

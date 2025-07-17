@@ -403,22 +403,29 @@ def muli(qc, a_reg, c, n_output_bits=None):
     return out_reg
 
 
-
-def divu(qc, a_reg, b_reg, n_output_bits=None, a_val=None, b_val=None):
-    """Divide unsigned ``a_reg`` by unsigned ``b_reg`` using restoring division.
-
-    Returns the quotient and remainder registers. ``a_reg`` and ``b_reg``
-    remain unchanged.
+def divu(qc, a_reg, b_reg, n_output_bits=None):
     """
+    Divide unsigned ``a_reg`` by unsigned ``b_reg`` using restoring division.
 
-    if b_val is not None and b_val == 0:
-        raise ValueError("Division by zero is not allowed.")
+    Returns the quotient and remainder quantum registers. ``a_reg`` and ``b_reg``
+    remain unchanged.
 
+    Args:
+        qc (QuantumCircuit): The quantum circuit to modify.
+        a_reg (QuantumRegister): Dividend register (n qubits).
+        b_reg (QuantumRegister): Divisor register (n qubits).
+        n_output_bits (int, optional): Width of the output quotient register. Defaults to n.
+
+    Returns:
+        tuple: (quotient QuantumRegister, remainder QuantumRegister)
+    """
     n = len(a_reg)
-    assert len(b_reg) == n
+    assert len(b_reg) == n, "Registers a_reg and b_reg must have the same length"
+
     if n_output_bits is None:
         n_output_bits = n
 
+    # Allocate quotient register
     existing = {reg.name for reg in qc.qregs}
     idx = 0
     while f"quotu{idx}" in existing:
@@ -426,47 +433,39 @@ def divu(qc, a_reg, b_reg, n_output_bits=None, a_val=None, b_val=None):
     qout = QuantumRegister(n_output_bits, name=f"quotu{idx}")
     qc.add_register(qout)
 
+    # Allocate remainder and sign ancilla
     rem = QuantumRegister(n, name=f"rem{idx}")
-    qc.add_register(rem)
-
     sign = QuantumRegister(1, name=f"sign{idx}")
+    qc.add_register(rem)
     qc.add_register(sign)
 
-    if a_val is not None and b_val is not None:
-        if b_val == 0:
-            raise ValueError("Division by zero is not allowed.")
-        quotient = (a_val // b_val) % (1 << n_output_bits)
-        remainder = a_val % b_val
-        for i in range(n_output_bits):
-            if (quotient >> i) & 1:
-                qc.x(qout[i])
-        for i in range(n):
-            if (remainder >> i) & 1:
-                qc.x(rem[i])
-        return qout, rem
-
+    # Begin restoring division algorithm
     for i in reversed(range(n_output_bits)):
+        # Shift remainder left by 1
         for j in reversed(range(1, n)):
             qc.swap(rem[j], rem[j - 1])
         if i < n:
             qc.swap(rem[0], a_reg[i])
 
+        # Subtract b from rem
         _sub_in_place(qc, rem, b_reg)
 
-        qc.cx(rem[n - 1], sign[0])
-
+        # If result was negative, restore (conditionally add back)
+        qc.cx(rem[n - 1], sign[0])  # MSB is 1 → negative
         _controlled_add_in_place(qc, rem, b_reg, sign[0])
 
+        # Set quotient bit
         qc.x(qout[i])
-        qc.cx(sign[0], qout[i])
+        qc.cx(sign[0], qout[i])  # qout[i] = 1 if subtraction was successful
 
+        # Uncompute sign flag
         qc.cx(qout[i], sign[0])
         qc.x(sign[0])
 
     return qout, rem
 
 
-def divui(qc, a_reg, divisor, n_output_bits=None, a_val=None):
+def divui(qc, a_reg, divisor, n_output_bits=None):
     """Divide ``a_reg`` by the classical ``divisor`` using restoring division.
 
     Returns the quotient and remainder registers.
@@ -477,12 +476,9 @@ def divui(qc, a_reg, divisor, n_output_bits=None, a_val=None):
         divisor (int): Unsigned integer divisor.
         n_output_bits (int, optional): Size of the output register. Defaults to
             ``len(a_reg)``.
-        a_val (int, optional): If the classical value of ``a_reg`` is known,
-            it can be provided to classically initialise the output.
 
     Returns:
-        QuantumRegister: Register holding the quotient of ``a_reg`` divided by
-            ``divisor``.
+        tuple: (quotient_register, remainder_register)
     """
 
     if divisor == 0:
@@ -504,17 +500,6 @@ def divui(qc, a_reg, divisor, n_output_bits=None, a_val=None):
 
     sign = QuantumRegister(1, name=f"sign{idx}")
     qc.add_register(sign)
-
-    if a_val is not None:
-        quotient = (a_val // divisor) % (1 << n_output_bits)
-        remainder = a_val % divisor
-        for i in range(n_output_bits):
-            if (quotient >> i) & 1:
-                qc.x(qout[i])
-        for i in range(n):
-            if (remainder >> i) & 1:
-                qc.x(rem[i])
-        return qout, rem
 
     for i in reversed(range(n_output_bits)):
         for j in reversed(range(1, n)):
@@ -537,13 +522,13 @@ def divui(qc, a_reg, divisor, n_output_bits=None, a_val=None):
     return qout, rem
 
 
-def div(qc, a_reg, b_reg, n_output_bits=None, a_val=None, b_val=None):
+def div(qc, a_reg, b_reg, n_output_bits=None):
     """Divide signed ``a_reg`` by signed ``b_reg``.
 
     The operation converts the inputs to sign+magnitude representation,
-    performs unsigned restoring division on the magnitudes and finally
-    restores two's complement form on the outputs.  The quotient sign is the
-    XOR of the input signs while the remainder sign matches ``a_reg``'s sign.
+    performs unsigned restoring division on the magnitudes, and finally
+    restores two's complement form on the outputs. The quotient sign is the
+    XOR of the input signs, and the remainder sign matches ``a_reg``'s sign.
 
     Parameters
     ----------
@@ -555,65 +540,25 @@ def div(qc, a_reg, b_reg, n_output_bits=None, a_val=None, b_val=None):
         Divisor register.
     n_output_bits : int, optional
         Size of the quotient register (default: ``len(a_reg)``).
-    a_val : int, optional
-        Classical value of ``a_reg`` for direct initialisation.
-    b_val : int, optional
-        Classical value of ``b_reg`` for direct initialisation.
 
     Returns
     -------
     tuple(QuantumRegister, QuantumRegister)
         Quotient and remainder registers in two's complement.
     """
-
-    if b_val is not None and b_val == 0:
-        raise ValueError("Division by zero is not allowed.")
-
     n = len(a_reg)
     assert len(b_reg) == n
     if n_output_bits is None:
         n_output_bits = n
 
-    existing = {reg.name for reg in qc.qregs}
-    idx = 0
-    while f"quot{idx}" in existing:
-        idx += 1
-    qout = QuantumRegister(n_output_bits, name=f"quot{idx}")
-    qc.add_register(qout)
-
-    rem = QuantumRegister(n, name=f"rem{idx}")
-    qc.add_register(rem)
-
-    if a_val is not None and b_val is not None:
-        if b_val == 0:
-            raise ValueError("Division by zero is not allowed.")
-
-        abs_a = abs(a_val)
-        abs_b = abs(b_val)
-        qmag = abs_a // abs_b
-        rmag = abs_a % abs_b
-        if (a_val < 0) ^ (b_val < 0):
-            qmag = -qmag
-        if a_val < 0:
-            rmag = -rmag
-
-        q_val = qmag if qmag >= 0 else (1 << n_output_bits) + qmag
-        r_val = rmag if rmag >= 0 else (1 << n) + rmag
-
-        for i in range(n_output_bits):
-            if (q_val >> i) & 1:
-                qc.x(qout[i])
-        for i in range(n):
-            if (r_val >> i) & 1:
-                qc.x(rem[i])
-
-        return qout, rem
-
+    # Convert a and b to sign+magnitude
     sign_a = twos_to_sign_magnitude(qc, a_reg)
     sign_b = twos_to_sign_magnitude(qc, b_reg)
 
+    # Perform unsigned division on magnitudes
     qout, rem = divu(qc, a_reg, b_reg, n_output_bits=n_output_bits)
 
+    # Compute quotient sign (XOR of input signs)
     existing = {reg.name for reg in qc.qregs}
     idx = 0
     while f"signq{idx}" in existing:
@@ -623,11 +568,13 @@ def div(qc, a_reg, b_reg, n_output_bits=None, a_val=None, b_val=None):
     qc.cx(sign_a[0], sign_q[0])
     qc.cx(sign_b[0], sign_q[0])
 
+    # Convert quotient and remainder back to two's complement
     sign_magnitude_to_twos(qc, qout, sign_q)
     qc.cx(qout[n_output_bits - 1], sign_q[0])
 
     sign_magnitude_to_twos(qc, rem, sign_a)
 
+    # Restore original a and b from sign+magnitude (optional for reversibility)
     sign_magnitude_to_twos(qc, a_reg, sign_a)
     qc.cx(a_reg[n - 1], sign_a[0])
     sign_magnitude_to_twos(qc, b_reg, sign_b)
@@ -636,10 +583,26 @@ def div(qc, a_reg, b_reg, n_output_bits=None, a_val=None, b_val=None):
     return qout, rem
 
 
-def divi(qc, a_reg, divisor, n_output_bits=None, a_val=None):
+def divi(qc, a_reg, divisor, n_output_bits=None):
     """Divide signed ``a_reg`` by signed integer ``divisor``.
 
     The implementation mirrors :func:`div` but with a classical divisor.
+
+    Parameters
+    ----------
+    qc : QuantumCircuit
+        Circuit to modify.
+    a_reg : QuantumRegister
+        Dividend register (two's complement).
+    divisor : int
+        Classical signed divisor.
+    n_output_bits : int, optional
+        Size of the quotient register (default: ``len(a_reg)``).
+
+    Returns
+    -------
+    tuple(QuantumRegister, QuantumRegister)
+        Quotient and remainder registers (two's complement).
     """
 
     if divisor == 0:
@@ -649,56 +612,31 @@ def divi(qc, a_reg, divisor, n_output_bits=None, a_val=None):
     if n_output_bits is None:
         n_output_bits = n
 
-    existing = {reg.name for reg in qc.qregs}
-    idx = 0
-    while f"quot{idx}" in existing:
-        idx += 1
-    qout = QuantumRegister(n_output_bits, name=f"quot{idx}")
-    qc.add_register(qout)
-
-    rem = QuantumRegister(n, name=f"rem{idx}")
-    qc.add_register(rem)
-
-    if a_val is not None:
-        abs_a = abs(a_val)
-        abs_b = abs(divisor)
-        qmag = abs_a // abs_b
-        rmag = abs_a % abs_b
-        if (a_val < 0) ^ (divisor < 0):
-            qmag = -qmag
-        if a_val < 0:
-            rmag = -rmag
-
-        q_val = qmag if qmag >= 0 else (1 << n_output_bits) + qmag
-        r_val = rmag if rmag >= 0 else (1 << n) + rmag
-
-        for i in range(n_output_bits):
-            if (q_val >> i) & 1:
-                qc.x(qout[i])
-        for i in range(n):
-            if (r_val >> i) & 1:
-                qc.x(rem[i])
-
-        return qout, rem
-
+    # Convert a to sign+magnitude
     sign_a = twos_to_sign_magnitude(qc, a_reg)
 
+    # Divide magnitudes using unsigned divui
     qout, rem = divui(qc, a_reg, abs(divisor), n_output_bits=n_output_bits)
 
+    # Compute quotient sign
     existing = {reg.name for reg in qc.qregs}
     idx = 0
     while f"signq{idx}" in existing:
         idx += 1
     sign_q = QuantumRegister(1, name=f"signq{idx}")
     qc.add_register(sign_q)
+
     if divisor < 0:
         qc.x(sign_q[0])
     qc.cx(sign_a[0], sign_q[0])
 
+    # Convert back to two's complement
     sign_magnitude_to_twos(qc, qout, sign_q)
     qc.cx(qout[n_output_bits - 1], sign_q[0])
 
     sign_magnitude_to_twos(qc, rem, sign_a)
+
+    # Optionally restore input (for reversibility)
     sign_magnitude_to_twos(qc, a_reg, sign_a)
     qc.cx(a_reg[n - 1], sign_a[0])
 

@@ -1,6 +1,6 @@
 from qiskit import QuantumCircuit
 from q_arithmetics import set_number_of_bits, initialize_variable, measure, abs_val
-import test_utils as tu
+import utils_test as tu
 
 TOTAL_QUBITS = 8
 
