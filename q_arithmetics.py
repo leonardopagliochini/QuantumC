@@ -428,7 +428,11 @@ def divu(qc, a_reg, b_reg, n_output_bits=None):
     # Allocate quotient register
     existing = {reg.name for reg in qc.qregs}
     idx = 0
-    while f"quotu{idx}" in existing:
+    while (
+        f"quotu{idx}" in existing
+        or f"rem{idx}" in existing
+        or f"sign{idx}" in existing
+    ):
         idx += 1
     qout = QuantumRegister(n_output_bits, name=f"quotu{idx}")
     qc.add_register(qout)
@@ -490,7 +494,11 @@ def divui(qc, a_reg, divisor, n_output_bits=None):
 
     existing = {reg.name for reg in qc.qregs}
     idx = 0
-    while f"quotu{idx}" in existing:
+    while (
+        f"quotu{idx}" in existing
+        or f"rem{idx}" in existing
+        or f"sign{idx}" in existing
+    ):
         idx += 1
     qout = QuantumRegister(n_output_bits, name=f"quotu{idx}")
     qc.add_register(qout)
