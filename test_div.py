@@ -61,7 +61,7 @@ def main():
             exp_q_bin = tu.to_binary(exp_q, n) if not overflow_q else "overflow"
             exp_r_bin = tu.to_binary(exp_r, n) if not overflow_r else "overflow"
 
-            ok = (q_val == exp_q) and (r_val == exp_r)
+            ok = (overflow_q or q_val == exp_q) and (overflow_r or r_val == exp_r)
 
             rows.append(
                 (

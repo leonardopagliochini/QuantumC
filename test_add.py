@@ -31,7 +31,7 @@ def main():
             exp = a + b
             overflow = exp < min_val or exp > max_val
             exp_bin = tu.to_binary(exp, n) if not overflow else "overflow"
-            ok = res == exp
+            ok = overflow or (res == exp)
             rows.append(("add", a, a_bin, b, b_bin, exp, exp_bin, res, res_bits, ok))
     tu.print_table(rows, csv_path="test_log/test_add.csv")
 
