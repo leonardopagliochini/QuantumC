@@ -188,6 +188,36 @@ def invert(qc, qreg):
 
     return qreg
 
+def conditional_invert(qc, qreg, ctrl_qubit):
+    """
+    Inverts a two's complement quantum register if ctrl_qubit == 1.
+    Performs: qreg -> -qreg (in-place), conditionally.
+
+    Args:
+        qc (QuantumCircuit): Circuit to modify.
+        qreg (QuantumRegister): Register to invert.
+        ctrl_qubit (Qubit): Control qubit.
+    """
+    n = len(qreg)
+
+    # Create temporary inverted copy
+    inv_reg = QuantumRegister(n, name=f"{qreg.name}_inv")
+    qc.add_register(inv_reg)
+
+    # Copy qreg to inv_reg
+    for i in range(n):
+        qc.cx(qreg[i], inv_reg[i])
+
+    # Invert: ~inv_reg + 1
+    for i in range(n):
+        qc.cx(ctrl_qubit, inv_reg[i])
+    addi_in_place(qc, inv_reg, 1)
+
+    # Conditional swap: if ctrl_qubit == 1, swap qreg and inv_reg
+    for i in range(n):
+        qc.cswap(ctrl_qubit, qreg[i], inv_reg[i])
+
+
 def addi(qc, a_reg, b):
     """
     Add a classical integer b to a quantum register a_reg,
@@ -274,7 +304,7 @@ def subi(qc, qreg, b):
     """
     return addi(qc, qreg, -b)
 
-def mul(qc, a_reg, b_reg, a_val=None, b_val=None):
+def mul(qc, a_reg, b_reg):
     """
     Multiply two quantum registers using QFT-based logic.
     Result is stored in an n-bit register (i.e. modulo 2^n).
@@ -310,11 +340,6 @@ def mul(qc, a_reg, b_reg, a_val=None, b_val=None):
 
     # Inverse QFT
     qc.append(QFT(n, do_swaps=False).inverse(), out_reg)
-
-    # Sign correction (if signs are known)
-    if a_val is not None and b_val is not None:
-        if (a_val < 0) ^ (b_val < 0):  # segni opposti
-            invert(qc, out_reg)
 
     return out_reg
 
@@ -364,22 +389,22 @@ def muli(qc, a_reg, c, n_output_bits=None):
 
     return out_reg
 
-def divi(qc, a_reg, divisor, n_output_bits=None):
+def divi_positive(qc, a_reg, divisor, n_output_bits=None):
     """
-    Divide a quantum register by a classical integer using QFT-based logic.
-    Supports signed division using two's complement.
+    Divide an unsigned quantum register by a classical positive integer using QFT-based logic.
+    Only works if a_reg is initialized to a classical positive integer (no superposition).
 
     Args:
         qc (QuantumCircuit): The quantum circuit to modify.
-        a_reg (QuantumRegister): Dividend quantum register (signed integer in 2's complement).
-        divisor (int): Classical divisor (can be negative).
-        n_output_bits (int, optional): Number of bits in output register. Default = len(a_reg).
+        a_reg (QuantumRegister): Unsigned dividend (classical).
+        divisor (int): Positive classical divisor.
+        n_output_bits (int): Number of bits in the output register.
 
     Returns:
-        QuantumRegister: New quantum register with the result of floor(a / divisor).
+        QuantumRegister: Register with floor(a / divisor).
     """
-    if divisor == 0:
-        raise ValueError("Division by zero is not allowed.")
+    if divisor <= 0:
+        raise ValueError("divisor must be a positive integer.")
 
     n = len(a_reg)
     if n_output_bits is None:
@@ -392,45 +417,44 @@ def divi(qc, a_reg, divisor, n_output_bits=None):
     qout = QuantumRegister(n_output_bits, name=f"quot{idx}")
     qc.add_register(qout)
 
-    # QFT on output
     qc.append(QFT(n_output_bits, do_swaps=False), qout)
-
-    abs_divisor = abs(divisor)
     for j in range(n):
         for k in range(n_output_bits):
-            angle = (2 * np.pi * (2 ** j) / abs_divisor) / (2 ** (k + 1))
-            angle = angle % (2 * np.pi)
-            if angle != 0:
+            angle = (2 * np.pi * (2 ** j) / divisor) / (2 ** (k + 1))
+            if angle % (2 * np.pi) != 0:
                 qc.cp(angle, a_reg[j], qout[k])
-
-    # Inverse QFT
     qc.append(QFT(n_output_bits, do_swaps=False).inverse(), qout)
 
-    # Sign correction if divisor < 0
+    return qout
+
+
+def divi(qc, a_reg, divisor, n_output_bits=None):
+    """
+    Signed division using unsigned division + conditional inversion of the result.
+    """
+    n = len(a_reg)
+    if n_output_bits is None:
+        n_output_bits = n
+    if divisor == 0:
+        raise ValueError("Division by zero")
+
+    # === Step 1: unsigned division ===
+    qout = divi_positive(qc, a_reg, abs(divisor), n_output_bits)
+
+    # === Step 2: build control bit for sign correction ===
+    ctrl = QuantumRegister(1, name="ctrl_sign_flip")
+    qc.add_register(ctrl)
+
+    # ctrl = sign(a) ⊕ sign(divisor)
+    qc.cx(a_reg[n - 1], ctrl[0])
     if divisor < 0:
-        invert(qc, qout)
+        qc.x(ctrl[0])
 
-    # Sign correction if dividend < 0
-    sign_flag = a_reg[n - 1]
-    tmp = QuantumRegister(n_output_bits, name=f"tmpinv{idx}")
-    qc.add_register(tmp)
-
-    # Copy qout to tmp
-    for i in range(n_output_bits):
-        qc.cx(qout[i], tmp[i])
-
-    # Bitwise NOT on tmp (conditional via control)
-    for i in range(n_output_bits):
-        qc.cx(sign_flag, tmp[i])
-
-    # Add 1 to tmp
-    addi_in_place(qc, tmp, 1)
-
-    # Conditionally move tmp back to qout using CSWAP
-    for i in range(n_output_bits):
-        qc.cswap(sign_flag, qout[i], tmp[i])
+    # === Step 3: apply conditional inversion
+    conditional_invert(qc, qout, ctrl[0])
 
     return qout
+
 
 
 def equal(qc, a_reg, b_reg):
