@@ -31,7 +31,11 @@ def main():
             measure_single(qc, out, out._register.name + "_measure")
             res_bits, res = tu.run_circuit(qc, signed=False)[f"{out._register.name}_measure"]
             exp = 1 if a >= b else 0
-            rows.append(("greater_equal", a, a_bin, b, b_bin, exp, str(exp), res, res_bits, res == exp))
+            diff = a - b
+            overflow = diff < min_val or diff > max_val
+            exp_str = str(exp) if not overflow else "overflow"
+            ok = overflow or (res == exp)
+            rows.append(("greater_equal", a, a_bin, b, b_bin, exp, exp_str, res, res_bits, ok))
     tu.print_table(rows, csv_path="test_log/test_greater_equal.csv")
 
 
