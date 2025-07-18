@@ -21,7 +21,7 @@ def main():
     for a in vals:
         for b in vals:
             print(f"greater_equal: a={a}, b={b}")
-            set_number_of_bits(n)
+            set_number_of_bits(n*2)
             qc = QuantumCircuit()
             a_bin = tu.to_binary(a, n)
             b_bin = tu.to_binary(b, n)

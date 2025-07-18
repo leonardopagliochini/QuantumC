@@ -135,8 +135,6 @@ def add(qc, a_reg, b_reg):
 
     return s_reg
 
-
-
 def addi_in_place(qc, qreg, b):
     """
     Add a classical integer to a quantum register using a quantum circuit.
