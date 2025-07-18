@@ -3,6 +3,7 @@ from qiskit import QuantumCircuit, QuantumRegister
 from qiskit.circuit.library.standard_gates import PhaseGate
 from qiskit.circuit.library import QFT
 from q_arithmetics import *
+from q_arithmetics import _sub_in_place, _controlled_add_in_place
 import numpy as np
 
 NUMBER_OF_BITS = 4
