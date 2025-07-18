@@ -21,6 +21,7 @@ from c_ast import (
     Expression,
     IntegerLiteral,
     DeclRef,
+    UnaryOperator,
     BinaryOperator,
     BinaryOperatorWithImmediate,
     VarDecl,
@@ -28,6 +29,7 @@ from c_ast import (
     ReturnStmt,
     FunctionDecl,
 )
+
 from dialect_ops import AddiImmOp, SubiImmOp, MuliImmOp, DivSImmOp
 
 
@@ -122,6 +124,19 @@ class MLIRGenerator:
             op = op_cls(lhs_val, imm)
             self.current_block.add_op(op)
             return op.results[0]
+
+        if isinstance(expr, UnaryOperator):
+            operand_val = self.process_expression(expr.operand)
+            # Map unary opcodes to equivalent binary ops if needed.
+            # For now, we only support `-x` via `0 - x`
+            if expr.opcode == '-':
+                zero_op = ConstantOp.from_int_and_width(0, 32)
+                self.current_block.add_op(zero_op)
+                op = SubiOp(zero_op.results[0], operand_val)
+                self.current_block.add_op(op)
+                return op.results[0]
+            raise ValueError(f"Unsupported unary operator: {expr.opcode}")
+
 
         raise TypeError(f"Unsupported expression type: {type(expr)}")
 

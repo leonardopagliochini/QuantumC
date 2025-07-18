@@ -3,8 +3,10 @@
 int main() {
 
     int a;
+    int b;
     a = 1;
-    int b = a * 2 + 4;
+    b = -a;
     return b;
 }
+
 
