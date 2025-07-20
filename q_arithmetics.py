@@ -310,7 +310,7 @@ def abs_val(qc, qreg):
     twos_to_sign_magnitude(qc, qreg)
     return qreg
 
-def mul(qc, a_reg, b_reg, a_val=None, b_val=None):
+def mul(qc, a_reg, b_reg):
     """
     Multiply two quantum registers using QFT-based logic.
     Result is stored in an n-bit register (i.e. modulo 2^n).
@@ -346,11 +346,6 @@ def mul(qc, a_reg, b_reg, a_val=None, b_val=None):
 
     # Inverse QFT
     qc.append(QFT(n, do_swaps=False).inverse(), out_reg)
-
-    # Sign correction (if signs are known)
-    if a_val is not None and b_val is not None:
-        if (a_val < 0) ^ (b_val < 0):  # segni opposti
-            invert(qc, out_reg)
 
     return out_reg
 

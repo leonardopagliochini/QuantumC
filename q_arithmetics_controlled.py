@@ -92,7 +92,7 @@ def sub_controlled(qc, a_reg, b_reg, control):
 def subi_controlled(qc, a_reg, b, control):
     return addi_controlled(qc, a_reg, -b, control)
 
-def mul_controlled(qc, a_reg, b_reg, control, a_val=None, b_val=None):
+def mul_controlled(qc, a_reg, b_reg, control):
     n = len(a_reg)
     existing = {reg.name for reg in qc.qregs}
     idx = 0
@@ -108,9 +108,6 @@ def mul_controlled(qc, a_reg, b_reg, control, a_val=None, b_val=None):
                 if lam != 0:
                     qc.append(PhaseGate(lam).control(3), [control, a_reg[n - j], b_reg[n - i], out_reg[k - 1]])
     qc.append(QFT(n, do_swaps=False).inverse(), out_reg)
-    if a_val is not None and b_val is not None:
-        if (a_val < 0) ^ (b_val < 0):
-            invert_controlled(qc, out_reg, control)
     return out_reg
 
 def muli_controlled(qc, a_reg, c, control, n_output_bits=None):

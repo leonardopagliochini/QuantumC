@@ -22,7 +22,7 @@ def main():
             ctrl = QuantumRegister(1, "ctrl")
             qc.add_register(ctrl)
             qc.x(ctrl[0])
-            out = mul_controlled(qc, ar, br, ctrl[0], a_val=a, b_val=b)
+            out = mul_controlled(qc, ar, br, ctrl[0])
             measure(qc, out)
             res_bits, res = tu.run_circuit(qc)[f"{out.name}_measure"]
             exp = a * b
