@@ -56,6 +56,11 @@ class BinaryOperatorWithImmediate(Expression):
     lhs: Expression
     rhs: Expression
 
+@dataclass
+class UnaryOperator(Expression):
+    """Unary operation like -x, !x, or ~x."""
+    opcode: str
+    operand: Expression
 
 @dataclass
 class VarDecl:
@@ -163,6 +168,14 @@ def parse_expression(expr_node: Dict) -> Expression:
         if isinstance(lhs_expr, IntegerLiteral) ^ isinstance(rhs_expr, IntegerLiteral):
             return BinaryOperatorWithImmediate(opcode, lhs_expr, rhs_expr)
         return BinaryOperator(opcode, lhs_expr, rhs_expr)
+
+    # unary operations
+    if kind == "UnaryOperator":
+        opcode = expr_node["opcode"]
+        # The operand is usually wrapped in an ImplicitCastExpr — you already strip that.
+        operand_expr = parse_expression(expr_node["inner"][0])
+        return UnaryOperator(opcode, operand_expr)
+
 
     raise ValueError(f"Unsupported expression node: {kind}")
 
@@ -352,6 +365,10 @@ def pretty_print_expression(expr: Expression) -> str:
     # Variables are referenced by name.
     if isinstance(expr, DeclRef):
         return expr.name
+    # Unary operations
+    if isinstance(expr, UnaryOperator):
+        operand = pretty_print_expression(expr.operand)
+        return f"({expr.opcode}{operand})"
     # Standard binary operator using infix notation.
     if isinstance(expr, BinaryOperator):
         lhs = pretty_print_expression(expr.lhs)
