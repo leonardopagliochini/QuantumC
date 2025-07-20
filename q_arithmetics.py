@@ -868,6 +868,56 @@ def simulate(qc, shots=1024):
 
     return signed
 
+def logical_and(qc, q1, q2):
+    """
+    Compute logical AND between two qubits.
+
+    Args:
+        qc (QuantumCircuit): The quantum circuit to modify.
+        q1 (Qubit): First input qubit.
+        q2 (Qubit): Second input qubit.
+
+    Returns:
+        Qubit: Output qubit set to |1> iff q1 == 1 and q2 == 1
+    """
+    existing = {reg.name for reg in qc.qregs}
+    idx = 0
+    while f"and{idx}" in existing:
+        idx += 1
+    and_reg = QuantumRegister(1, name=f"and{idx}")
+    qc.add_register(and_reg)
+
+    qc.x(and_reg[0])        # initialize in |1>
+    qc.ccx(q1, q2, and_reg[0])
+    return and_reg[0]
+
+def logical_or(qc, q1, q2):
+    """
+    Compute logical OR between two qubits.
+
+    Args:
+        qc (QuantumCircuit): The quantum circuit to modify.
+        q1 (Qubit): First input qubit.
+        q2 (Qubit): Second input qubit.
+
+    Returns:
+        Qubit: Output qubit set to |1> iff q1 == 1 or q2 == 1
+    """
+    existing = {reg.name for reg in qc.qregs}
+    idx = 0
+    while f"or{idx}" in existing:
+        idx += 1
+    or_reg = QuantumRegister(1, name=f"or{idx}")
+    qc.add_register(or_reg)
+
+    qc.x(or_reg[0])        # initialize in |1>
+    # Use De Morgan: q1 OR q2 = NOT (NOT q1 AND NOT q2)
+    qc.x(q1)
+    qc.x(q2)
+    qc.ccx(q1, q2, or_reg[0])
+    qc.x(q1)
+    qc.x(q2)
+    return or_reg[0]
 
 
 
