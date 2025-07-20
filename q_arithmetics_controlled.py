@@ -13,6 +13,52 @@ def int_to_twos_complement(value):
         value = (1 << NUMBER_OF_BITS) + value
     return [(value >> i) & 1 for i in range(NUMBER_OF_BITS)]
 
+
+def initialize_variable_controlled(qc, value, control, register_name=None):
+    """
+    Initialize a new quantum register to a given integer value,
+    conditioned on the control qubit being |1⟩.
+
+    If control == 0, the register remains in the |0...0⟩ state.
+
+    Args:
+        qc (QuantumCircuit): The quantum circuit to modify.
+        value (int): The integer value to conditionally initialize.
+        control (Qubit): Control qubit.
+        register_name (str, optional): Name of the new register.
+
+    Returns:
+        QuantumRegister: The initialized register.
+    """
+    MIN_VAL = -2**(NUMBER_OF_BITS - 1)
+    MAX_VAL = 2**(NUMBER_OF_BITS - 1) - 1
+    if value < MIN_VAL or value > MAX_VAL:
+        raise ValueError(
+            f"Value {value} is out of range for two's complement with {NUMBER_OF_BITS} bits"
+        )
+
+    if register_name is None:
+        base_name = "qr"
+        idx = 0
+        existing = {reg.name for reg in qc.qregs}
+        while f"{base_name}{idx}" in existing:
+            idx += 1
+        register_name = f"{base_name}{idx}"
+
+    # Allocate the new quantum register
+    new_qreg = QuantumRegister(NUMBER_OF_BITS, name=register_name)
+    qc.add_register(new_qreg)
+
+    # Get the 2's complement representation
+    bits = int_to_twos_complement(value)
+
+    # For each bit that's 1, apply a controlled X gate
+    for i, bit in enumerate(bits):
+        if bit == 1:
+            qc.cx(control, new_qreg[i])
+
+    return new_qreg
+
 def add_in_place_controlled(qc, a_reg, b_reg, control):
     n = len(a_reg)
     qc.append(QFT(n, do_swaps=False), a_reg)
