@@ -816,6 +816,35 @@ def measure_single(qc, qubit, name="result"):
     qc.add_register(creg)
     qc.measure(qubit, creg[0])
 
+def initialize_bit(qc, value, name=None):
+    """
+    Initialize a single qubit to |0⟩ or |1⟩ based on a classical bit value.
+
+    Args:
+        qc (QuantumCircuit): The quantum circuit to modify.
+        value (int): Bit value (0 or 1).
+        name (str, optional): Name of the qubit register.
+
+    Returns:
+        Qubit: Initialized qubit (|value⟩).
+    """
+    if value not in (0, 1):
+        raise ValueError("Bit value must be 0 or 1.")
+
+    existing = {reg.name for reg in qc.qregs}
+    idx = 0
+    base_name = "qb" if name is None else name
+    while f"{base_name}{idx}" in existing:
+        idx += 1
+    reg = QuantumRegister(1, name=f"{base_name}{idx}")
+    qc.add_register(reg)
+
+    if value == 1:
+        qc.x(reg[0])
+
+    return reg[0]
+
+
 def measure(qc, qreg):
     """
     Measure a quantum register and store the result in a classical register.
@@ -886,8 +915,6 @@ def logical_and(qc, q1, q2):
         idx += 1
     and_reg = QuantumRegister(1, name=f"and{idx}")
     qc.add_register(and_reg)
-
-    qc.x(and_reg[0])        # initialize in |1>
     qc.ccx(q1, q2, and_reg[0])
     return and_reg[0]
 
