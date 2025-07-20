@@ -82,10 +82,7 @@ class AssignStmt:
 
 @dataclass
 class CompoundStmt:
-    """Sequence of statements forming a block."""
-
-    stmts: List[Union[VarDecl, ReturnStmt, AssignStmt]] = field(default_factory=list)
-
+    stmts: List[Union[VarDecl, ReturnStmt, AssignStmt, 'IfStmt']] = field(default_factory=list)
 
 @dataclass
 class FunctionDecl:
@@ -101,6 +98,12 @@ class TranslationUnit:
     """Top-level container of all functions."""
 
     decls: List[FunctionDecl] = field(default_factory=list)
+
+@dataclass
+class IfStmt:
+    condition: Expression
+    then_body: CompoundStmt
+    else_body: Optional[CompoundStmt] = None
 
 
 # -----------------------------------------------------------------------------
@@ -200,36 +203,10 @@ def parse_ast(ast_json: Dict) -> TranslationUnit:
 
             # Iterate over all statements inside the compound statement.
             for stmt in inner.get("inner", []):
-                if stmt["kind"] == "DeclStmt":
-                    # A DeclStmt can contain multiple variable declarations.
-                    for var_decl in stmt.get("inner", []):
-                        if var_decl.get("kind") == "VarDecl":
-                            init_expr = None
-                            if "inner" in var_decl and var_decl["inner"]:
-                                # Parse the initializer if present.
-                                init_expr = parse_expression(var_decl["inner"][0])
-                            compound_stmt.stmts.append(VarDecl(var_decl["name"], init_expr))
-                elif stmt["kind"] == "BinaryOperator" and stmt["opcode"] == "=":
-                    # Assignment statement ``x = expr``.
-                    lhs = stmt["inner"][0]
-                    rhs = stmt["inner"][1]
-                    if lhs.get("kind") != "DeclRefExpr":
-                        raise ValueError(f"Unsupported assignment LHS: {lhs['kind']}")
+                parsed = parse_statement(stmt)
+                if parsed:
+                    compound_stmt.stmts.append(parsed)
 
-                    var_name = lhs.get("name") or lhs.get("referencedDecl", {}).get("name")
-                    if not var_name:
-                        raise ValueError("Cannot resolve variable name in assignment LHS")
-                    rhs_expr = parse_expression(rhs)
-                    compound_stmt.stmts.append(AssignStmt(var_name, rhs_expr))
-                elif stmt["kind"] == "ReturnStmt":
-                    # Return statement possibly with a value.
-                    return_expr = None
-                    if "inner" in stmt and stmt["inner"]:
-                        return_expr = parse_expression(stmt["inner"][0])
-                    compound_stmt.stmts.append(ReturnStmt(return_expr))
-                else:
-                    # Ignore any unrecognized statement types.
-                    pass
 
         # If we successfully built a function body, add the function to the TU.
         if compound_stmt:
@@ -237,48 +214,122 @@ def parse_ast(ast_json: Dict) -> TranslationUnit:
 
     return tu
 
+def parse_statement(stmt: Dict) -> Optional[Union[VarDecl, AssignStmt, ReturnStmt, IfStmt]]:
+    kind = stmt.get("kind")
+
+    if kind == "DeclStmt":
+        for var_decl in stmt.get("inner", []):
+            if var_decl.get("kind") == "VarDecl":
+                init_expr = None
+                if "inner" in var_decl and var_decl["inner"]:
+                    init_expr = parse_expression(var_decl["inner"][0])
+                return VarDecl(var_decl["name"], init_expr)
+
+    elif kind == "BinaryOperator" and stmt["opcode"] == "=":
+        lhs = stmt["inner"][0]
+        rhs = stmt["inner"][1]
+        if lhs.get("kind") != "DeclRefExpr":
+            raise ValueError(f"Unsupported assignment LHS: {lhs['kind']}")
+        var_name = lhs.get("name") or lhs.get("referencedDecl", {}).get("name")
+        rhs_expr = parse_expression(rhs)
+        return AssignStmt(var_name, rhs_expr)
+
+    elif kind == "ReturnStmt":
+        if "inner" in stmt and stmt["inner"]:
+            return_expr = parse_expression(stmt["inner"][0])
+            return ReturnStmt(return_expr)
+        else:
+            return ReturnStmt()
+
+    elif kind == "IfStmt":
+        condition = parse_expression(stmt["inner"][0])
+
+        then_raw = stmt["inner"][1]
+        then_block = CompoundStmt()
+        if then_raw["kind"] == "CompoundStmt":
+            for s in then_raw.get("inner", []):
+                parsed = parse_statement(s)
+                if parsed:
+                    then_block.stmts.append(parsed)
+
+        else_block = None
+        if len(stmt["inner"]) > 2:
+            else_raw = stmt["inner"][2]
+            if else_raw["kind"] == "IfStmt":
+                # this is an else if
+                nested_if = parse_statement(else_raw)
+                else_block = CompoundStmt(stmts=[nested_if]) if nested_if else None
+            elif else_raw["kind"] == "CompoundStmt":
+                else_block = CompoundStmt()
+                for s in else_raw.get("inner", []):
+                    parsed = parse_statement(s)
+                    if parsed:
+                        else_block.stmts.append(parsed)
+
+        return IfStmt(condition, then_block, else_block)
+
+    return None
+
+
+
 
 # -----------------------------------------------------------------------------
 # Pretty-Printing Utilities
 # -----------------------------------------------------------------------------
 
-def pretty_print_translation_unit(tu: TranslationUnit) -> str:
-    """Reconstruct a C-like program from a :class:`TranslationUnit`.
-
-    Parameters
-    ----------
-    tu:
-        Root object produced by :func:`parse_ast`.
-
-    Returns
-    -------
-    str
-        A string resembling the original C source code.
-    """
+def pretty_print_statement(stmt, indent=1) -> List[str]:
+    """Pretty-print any statement with correct indentation."""
+    indent_str = "    " * indent
     lines: List[str] = []
-    # Emit each function one after the other.
+
+    if isinstance(stmt, VarDecl):
+        if stmt.init:
+            expr_str = pretty_print_expression(stmt.init)
+            lines.append(f"{indent_str}int {stmt.name} = {expr_str};")
+        else:
+            lines.append(f"{indent_str}int {stmt.name};")
+
+    elif isinstance(stmt, AssignStmt):
+        expr_str = pretty_print_expression(stmt.value)
+        lines.append(f"{indent_str}{stmt.name} = {expr_str};")
+
+    elif isinstance(stmt, ReturnStmt):
+        if stmt.value:
+            expr_str = pretty_print_expression(stmt.value)
+            lines.append(f"{indent_str}return {expr_str};")
+        else:
+            lines.append(f"{indent_str}return;")
+
+    elif isinstance(stmt, IfStmt):
+        cond_str = pretty_print_expression(stmt.condition)
+        lines.append(f"{indent_str}if ({cond_str}) {{")
+        for inner in stmt.then_body.stmts:
+            lines.extend(pretty_print_statement(inner, indent + 1))
+        lines.append(f"{indent_str}}}")
+        if stmt.else_body:
+            lines.append(f"{indent_str}else {{")
+            for inner in stmt.else_body.stmts:
+                lines.extend(pretty_print_statement(inner, indent + 1))
+            lines.append(f"{indent_str}}}")
+
+    else:
+        lines.append(f"{indent_str}// Unsupported statement: {type(stmt).__name__}")
+
+    return lines
+
+def pretty_print_translation_unit(tu: TranslationUnit) -> str:
+    lines: List[str] = []
+
     for func in tu.decls:
         params = ", ".join(f"int {p}" for p in func.params)
         lines.append(f"int {func.name}({params}) {{")
-        # Handle all statements inside the body.
+
         for stmt in func.body.stmts:
-            if isinstance(stmt, VarDecl):
-                if stmt.init:
-                    expr_str = pretty_print_expression(stmt.init)
-                    lines.append(f"    int {stmt.name} = {expr_str};")
-                else:
-                    lines.append(f"    int {stmt.name};")
-            elif isinstance(stmt, AssignStmt):
-                expr_str = pretty_print_expression(stmt.value)
-                lines.append(f"    {stmt.name} = {expr_str};")
-            elif isinstance(stmt, ReturnStmt):
-                if stmt.value:
-                    expr_str = pretty_print_expression(stmt.value)
-                    lines.append(f"    return {expr_str};")
-                else:
-                    lines.append("    return;")
+            lines.extend(pretty_print_statement(stmt, indent=1))
+
         lines.append("}")
-        lines.append("")  # Blank line between functions
+        lines.append("")
+
     return "\n".join(lines)
 
 

@@ -1,10 +1,16 @@
-// #include <stdio.h>
-
 int main() {
-
     int a;
-    a = 1;
-    int b = a * 2 + 4;
-    return b;
+    a = 3;
+    int b = 0;
+    int c = 0;
+    if (a > b)
+    {
+        if (b == 0)
+        {
+            c = a * 3;
+        }
+        int d = c + a;
+    }
+    b = 6;
+    return c;
 }
-

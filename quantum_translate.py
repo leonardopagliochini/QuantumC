@@ -17,20 +17,18 @@ from xdsl.dialects.builtin import ModuleOp, i32
 from xdsl.dialects.func import FuncOp, ReturnOp
 from xdsl.dialects.arith import ConstantOp, AddiOp, SubiOp, MuliOp, DivSIOp
 from xdsl.ir import Block, Region, SSAValue, Operation
+from xdsl.dialects.func import ReturnOp
 
 # Quantum dialect operations that mirror the arithmetic ops but operate on
 # quantum registers instead of plain integers.
 from quantum_dialect import (
     QuantumInitOp,
-    QAddiOp,
-    QSubiOp,
-    QMuliOp,
-    QDivSOp,
-    QAddiImmOp,
-    QSubiImmOp,
-    QMuliImmOp,
-    QDivSImmOp,
+    QAddiOp, QSubiOp, QMuliOp, QDivSOp,
+    QAddiImmOp, QSubiImmOp, QMuliImmOp, QDivSImmOp,
+    CQAddiOp, CQSubiOp, CQMuliOp, CQDivSOp,
+    QAndOp,QCmpiOp, QNotOp, QuantumCInitOp, CQAddiImmOp, CQSubiImmOp, CQMuliImmOp, CQDivSImmOp,
 )
+
 
 @dataclass
 class ValueInfo:
@@ -77,6 +75,8 @@ class QuantumTranslator:
         # Registers are identified by an integer and are allocated sequentially.
         self.next_reg = 0
 
+        self.control_stack: list[SSAValue] = []
+
         # Mapping from SSA values in the original module to ``ValueInfo``
         # records.  These records describe which register currently contains the
         # value and how it can be recomputed if needed.
@@ -96,6 +96,169 @@ class QuantumTranslator:
 
         # Cache used by ``compute_cost`` to memoize recomputation costs.
         self.cost_cache: Dict[SSAValue, int] = {}
+
+    def emit_controlled_init(self, ctrl: SSAValue, value: int) -> SSAValue:
+        """Emit a controlled initialization to `value`, returning the new register."""
+        reg = self.allocate_reg()
+        init_op = QuantumCInitOp(ctrl, value)
+        self.current_block.add_op(init_op)
+        init_op.results[0].name_hint = f"q{reg}_0"
+        self.reg_version[reg] = 0
+        self.reg_ssa[reg] = init_op.results[0]
+        return init_op.results[0]
+
+
+    def translate_op(self, op: Operation):
+        if isinstance(op, ConstantOp):
+            value = op.value.value.data
+            ctrl = self.get_current_control()
+            if ctrl is None:
+                init_op = QuantumInitOp(value)
+            else:
+                init_op = QuantumCInitOp(ctrl, value)
+
+            reg = self.allocate_reg()
+            self.current_block.add_op(init_op)
+            init_op.results[0].name_hint = f"q{reg}_0"
+            self.val_info[op.results[0]] = ValueInfo(reg, 0, ("const", value))
+            self.reg_ssa[reg] = init_op.results[0]
+            self.reg_version[reg] = 0
+
+        elif isinstance(op, (AddiOp, SubiOp, MuliOp, DivSIOp)):
+            lhs, rhs = op.operands
+            q_lhs = self.emit_value(lhs)
+            q_rhs = self.emit_value(rhs)
+            if q_lhs is q_rhs:
+                q_rhs = self.duplicate_value(rhs)
+            opcode = {
+                AddiOp: "add", SubiOp: "sub", MuliOp: "mul", DivSIOp: "div",
+            }[type(op)]
+            reg = self.allocate_reg()
+            new_op = self.create_binary_op(opcode, q_lhs, q_rhs)
+            self.current_block.add_op(new_op)
+            new_op.results[0].name_hint = f"q{reg}_0"
+            self.reg_ssa[reg] = new_op.results[0]
+            self.val_info[op.results[0]] = ValueInfo(reg, 0, ("binary", (opcode, lhs, rhs)))
+
+        elif op.name == "arith.cmpi":
+            lhs, rhs = op.operands
+            predicate = int(op.predicate.value.data)
+            q_lhs = self.emit_value(lhs)
+            q_rhs = self.emit_value(rhs)
+            cmp_op = QCmpiOp(q_lhs, q_rhs, predicate)
+            self.current_block.add_op(cmp_op)
+
+            reg = self.allocate_reg()
+            cmp_op.results[0].name_hint = f"q{reg}_0"
+            self.reg_ssa[reg] = cmp_op.results[0]
+            self.reg_version[reg] = 0
+
+            self.val_info[op.results[0]] = ValueInfo(reg, 0, ("cmpi", lhs, rhs, predicate))
+        
+        elif op.name == "cf.cond_br":
+            cond_val = self.emit_value(op.operands[0])
+            true_block = op.successors[0]
+            false_block = op.successors[1]
+
+            # Push condition for 'then'
+            self.control_stack.append(cond_val)
+            for inner_op in true_block.ops:
+                self.translate_op(inner_op)
+            self.control_stack.pop()
+
+            # Invert the condition using NOT
+            inverted = QNotOp(cond_val)
+            self.current_block.add_op(inverted)
+
+            inverted_reg = self.allocate_reg()
+            inverted.results[0].name_hint = f"q{inverted_reg}_0"
+            self.reg_version[inverted_reg] = 0
+            self.reg_ssa[inverted_reg] = inverted.results[0]
+
+
+            # Push inverted condition for 'else'
+            self.control_stack.append(inverted.results[0])
+            for inner_op in false_block.ops:
+                self.translate_op(inner_op)
+            self.control_stack.pop()
+
+        elif isinstance(op, ReturnOp):
+            if op.operands:
+                q_val = self.emit_value(op.operands[0])
+                ret = ReturnOp(q_val)
+            else:
+                ret = ReturnOp([])
+            self.current_block.add_op(ret)
+        elif op.name in ("iarith.addi_imm", "iarith.subi_imm", "iarith.muli_imm", "iarith.divsi_imm"):
+            (lhs,) = op.operands
+            imm = int(op.imm.value.data)
+            q_lhs = self.emit_value(lhs)
+            opcode = {
+                "iarith.addi_imm": "add",
+                "iarith.subi_imm": "sub",
+                "iarith.muli_imm": "mul",
+                "iarith.divsi_imm": "div",
+            }[op.name]
+
+            reg = self.allocate_reg()
+            new_op = self.create_binary_imm_op(opcode, q_lhs, imm)
+            self.current_block.add_op(new_op)
+
+            new_op.results[0].name_hint = f"q{reg}_0"
+            self.reg_ssa[reg] = new_op.results[0]
+            self.reg_version[reg] = 0
+            self.val_info[op.results[0]] = ValueInfo(reg, 0, ("binaryimm", (opcode, lhs, imm)))
+
+        else:
+            raise NotImplementedError(f"Unsupported op {op.name}")
+
+
+    def get_current_control(self) -> SSAValue | None:
+        """Combine active control conditions using QAndOp if needed."""
+        if not self.control_stack:
+            return None
+        if len(self.control_stack) == 1:
+            return self.control_stack[0]
+
+        ctrl = self.control_stack[0]
+        for cond in self.control_stack[1:]:
+            new_ctrl = self.allocate_reg()
+            and_op = QAndOp(ctrl, cond)
+            self.current_block.add_op(and_op)
+            and_op.results[0].name_hint = f"q{new_ctrl}_0"
+            self.reg_version[new_ctrl] = 0
+            self.reg_ssa[new_ctrl] = and_op.results[0]
+            ctrl = and_op.results[0]
+        return ctrl
+
+    def combine_controls(self, controls: list[SSAValue]) -> SSAValue:
+        """Return the conjunction (AND) of multiple control bits."""
+        if not controls:
+            raise ValueError("No control signals provided")
+        if len(controls) == 1:
+            return controls[0]
+        current = controls[0]
+        for ctrl in controls[1:]:
+            reg = self.allocate_reg()
+            and_op = QAndOp(current, ctrl)
+            self.current_block.add_op(and_op)
+            and_op.results[0].name_hint = f"q{reg}_0"
+            self.reg_version[reg] = 0
+            self.reg_ssa[reg] = and_op.results[0]
+            current = and_op.results[0]
+        return current
+
+    def create_controlled_op(self, opcode: str, lhs: SSAValue, rhs: SSAValue, ctrl: SSAValue) -> Operation:
+        """Emit a controlled quantum operation."""
+        if opcode == "add":
+            return CQAddiOp(lhs, rhs, ctrl)
+        if opcode == "sub":
+            return CQSubiOp(lhs, rhs, ctrl)
+        if opcode == "mul":
+            return CQMuliOp(lhs, rhs, ctrl)
+        if opcode == "div":
+            return CQDivSOp(lhs, rhs, ctrl)
+        raise NotImplementedError(f"Unknown opcode for controlled op: {opcode}")
 
     # ------------------------------------------------------------------
     def translate(self) -> ModuleOp:
@@ -283,76 +446,93 @@ class QuantumTranslator:
             raise NotImplementedError
 
     # ------------------------------------------------------------------
+    # def duplicate_value(self, val: SSAValue) -> SSAValue:
+    #     """Return a fresh register with the same value as ``val``."""
+
+    #     info = self.val_info[val]
+    #     expr = info.expr
+
+    #     if expr[0] == "const":
+    #         reg = self.allocate_reg()
+    #         op = QuantumInitOp(expr[1])
+    #         self.current_block.add_op(op)
+    #         op.results[0].name_hint = f"q{reg}_0"
+    #         self.reg_version[reg] = 0
+    #         self.reg_ssa[reg] = op.results[0]
+    #         return op.results[0]
+
+    #     if expr[0] == "binary":
+    #         opcode, lhs, rhs = expr[1]
+    #         q_lhs = self.emit_value(lhs)
+    #         q_rhs = self.emit_value(rhs)
+    #         if q_lhs is q_rhs:
+    #             q_rhs = self.duplicate_value(rhs)
+    #         reg = self.allocate_reg()
+    #         op = self.create_binary_op(opcode, q_lhs, q_rhs)
+    #         self.current_block.add_op(op)
+    #         op.results[0].name_hint = f"q{reg}_0"
+    #         self.reg_version[reg] = 0
+    #         self.reg_ssa[reg] = op.results[0]
+    #         return op.results[0]
+
+    #     if expr[0] == "binaryimm":
+    #         opcode, lhs, imm = expr[1]
+    #         q_lhs = self.emit_value(lhs)
+    #         reg = self.allocate_reg()
+    #         op = self.create_binary_imm_op(opcode, q_lhs, imm)
+    #         self.current_block.add_op(op)
+    #         op.results[0].name_hint = f"q{reg}_0"
+    #         self.reg_version[reg] = 0
+    #         self.reg_ssa[reg] = op.results[0]
+    #         return op.results[0]
+
+    #     raise NotImplementedError
+
     def duplicate_value(self, val: SSAValue) -> SSAValue:
-        """Return a fresh register with the same value as ``val``."""
+        """Return a fresh register that is a copy of ``val`` using addi_imm 0."""
+        q_val = self.emit_value(val)
+        reg = self.allocate_reg()
+        op = QAddiImmOp(q_val, 0)
+        self.current_block.add_op(op)
+        op.results[0].name_hint = f"q{reg}_0"
+        self.reg_version[reg] = 0
+        self.reg_ssa[reg] = op.results[0]
+        return op.results[0]
 
-        info = self.val_info[val]
-        expr = info.expr
-
-        if expr[0] == "const":
-            reg = self.allocate_reg()
-            op = QuantumInitOp(expr[1])
-            self.current_block.add_op(op)
-            op.results[0].name_hint = f"q{reg}_0"
-            self.reg_version[reg] = 0
-            self.reg_ssa[reg] = op.results[0]
-            return op.results[0]
-
-        if expr[0] == "binary":
-            opcode, lhs, rhs = expr[1]
-            q_lhs = self.emit_value(lhs)
-            q_rhs = self.emit_value(rhs)
-            if q_lhs is q_rhs:
-                q_rhs = self.duplicate_value(rhs)
-            reg = self.allocate_reg()
-            op = self.create_binary_op(opcode, q_lhs, q_rhs)
-            self.current_block.add_op(op)
-            op.results[0].name_hint = f"q{reg}_0"
-            self.reg_version[reg] = 0
-            self.reg_ssa[reg] = op.results[0]
-            return op.results[0]
-
-        if expr[0] == "binaryimm":
-            opcode, lhs, imm = expr[1]
-            q_lhs = self.emit_value(lhs)
-            reg = self.allocate_reg()
-            op = self.create_binary_imm_op(opcode, q_lhs, imm)
-            self.current_block.add_op(op)
-            op.results[0].name_hint = f"q{reg}_0"
-            self.reg_version[reg] = 0
-            self.reg_ssa[reg] = op.results[0]
-            return op.results[0]
-
-        raise NotImplementedError
 
     # ------------------------------------------------------------------
     def create_binary_op(self, opcode: str, lhs: SSAValue, rhs: SSAValue) -> Operation:
-        """Emit a binary quantum op for ``opcode``."""
+        ctrl = self.get_current_control()
 
-        # Map the textual opcode to the corresponding quantum operation class.
-        if opcode == "add":
-            return QAddiOp(lhs, rhs)
-        if opcode == "sub":
-            return QSubiOp(lhs, rhs)
-        if opcode == "mul":
-            return QMuliOp(lhs, rhs)
-        if opcode == "div":
-            return QDivSOp(lhs, rhs)
+        if ctrl is None:
+            if opcode == "add": return QAddiOp(lhs, rhs)
+            if opcode == "sub": return QSubiOp(lhs, rhs)
+            if opcode == "mul": return QMuliOp(lhs, rhs)
+            if opcode == "div": return QDivSOp(lhs, rhs)
+        else:
+            if opcode == "add": return CQAddiOp(lhs, rhs, ctrl)
+            if opcode == "sub": return CQSubiOp(lhs, rhs, ctrl)
+            if opcode == "mul": return CQMuliOp(lhs, rhs, ctrl)
+            if opcode == "div": return CQDivSOp(lhs, rhs, ctrl)
         raise NotImplementedError(opcode)
+
 
     def create_binary_imm_op(self, opcode: str, lhs: SSAValue, imm: int) -> Operation:
         """Emit an immediate binary op for ``opcode``."""
+        ctrl = self.get_current_control()
 
-        # Similar to ``create_binary_op`` but one operand is a Python integer.
-        if opcode == "add":
-            return QAddiImmOp(lhs, imm)
-        if opcode == "sub":
-            return QSubiImmOp(lhs, imm)
-        if opcode == "mul":
-            return QMuliImmOp(lhs, imm)
-        if opcode == "div":
-            return QDivSImmOp(lhs, imm)
-        raise NotImplementedError(opcode)
+        if ctrl is None:
+            if opcode == "add": return QAddiImmOp(lhs, imm)
+            if opcode == "sub": return QSubiImmOp(lhs, imm)
+            if opcode == "mul": return QMuliImmOp(lhs, imm)
+            if opcode == "div": return QDivSImmOp(lhs, imm)
+        else:
+            if opcode == "add": return CQAddiImmOp(lhs, imm, ctrl)
+            if opcode == "sub": return CQSubiImmOp(lhs, imm, ctrl)
+            if opcode == "mul": return CQMuliImmOp(lhs, imm, ctrl)
+            if opcode == "div": return CQDivSImmOp(lhs, imm, ctrl)
+
+        raise NotImplementedError(f"Unknown opcode for immediate binary op: {opcode}")
 
     # ------------------------------------------------------------------
     def translate_func(self, func: FuncOp) -> FuncOp:
@@ -442,6 +622,37 @@ class QuantumTranslator:
                 new_op.results[0].name_hint = f"q{reg}_0"
                 self.reg_ssa[reg] = new_op.results[0]
                 self.val_info[op.results[0]] = ValueInfo(reg, 0, ("binaryimm", (opcode, lhs, imm)))
+            
+            elif op.name == "cf.cond_br":
+                cond_val = self.emit_value(op.operands[0])
+                true_block = op.successors[0]
+                false_block = op.successors[1]
+
+                # Push condition for 'then'
+                self.control_stack.append(cond_val)
+                for inner_op in true_block.ops:
+                    self.translate_op(inner_op)
+                self.control_stack.pop()
+
+                # Invert the control for 'else'
+                inverted_reg = self.allocate_reg()
+                false_ctrl = self.emit_value(op.operands[0])
+                # Invert control using: not x ≈ x xor 1
+                from xdsl.dialects.builtin import IntegerAttr
+                one_val = self.emit_controlled_init(ctrl=cond_val, value=1)
+                one_val.name_hint = f"q{self.next_reg - 1}_0"
+                inverted = QAddiOp(false_ctrl, one_val)  # XOR behavior: x + 1 mod 2
+                self.current_block.add_op(inverted)
+                inverted.results[0].name_hint = f"q{inverted_reg}_0"
+                self.reg_ssa[inverted_reg] = inverted.results[0]
+                self.reg_version[inverted_reg] = 0
+
+                # Push inverted condition for 'else'
+                self.control_stack.append(inverted.results[0])
+                for inner_op in false_block.ops:
+                    self.translate_op(inner_op)
+                self.control_stack.pop()
+
 
             elif isinstance(op, ReturnOp):
                 # Return statements are forwarded directly after materializing
@@ -452,6 +663,19 @@ class QuantumTranslator:
                 else:
                     ret = ReturnOp([])
                 self.current_block.add_op(ret)
+            
+            elif op.name == "arith.cmpi":
+                lhs, rhs = op.operands
+                predicate = int(op.predicate.value.data)
+                q_lhs = self.emit_value(lhs)
+                q_rhs = self.emit_value(rhs)
+                reg = self.allocate_reg()
+                cmp_op = QCmpiOp(q_lhs, q_rhs, predicate)
+                self.current_block.add_op(cmp_op)
+                cmp_op.results[0].name_hint = f"q{reg}_0"
+                self.val_info[op.results[0]] = ValueInfo(reg, 0, ("cmpi", lhs, rhs, predicate))
+                self.reg_ssa[reg] = cmp_op.results[0]
+
 
             else:
                 # Any other operation is currently unsupported.

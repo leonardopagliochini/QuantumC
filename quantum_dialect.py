@@ -11,6 +11,7 @@ import abc
 from typing import ClassVar
 from xdsl.ir import SSAValue, Attribute
 from xdsl.dialects.builtin import IntegerAttr, IntegerType, IndexType, AnyOf, i32
+from xdsl.irdl import attr_def
 from xdsl.parser import Parser
 from xdsl.printer import Printer
 from xdsl.irdl import (
@@ -25,8 +26,31 @@ from xdsl.irdl import (
 )
 from xdsl.traits import Pure
 
+from xdsl.ir import OpResult, SSAValue
+from xdsl.irdl import irdl_op_definition, Operand
+from xdsl.irdl import result_def
+from xdsl.ir import Operation
+from xdsl.dialects.builtin import i1
+
 # Matcher used to ensure operands are signless integers or indices.
 signlessIntegerLike = AnyOf([IntegerType, IndexType])
+
+@irdl_op_definition
+class QAndOp(IRDLOperation):
+    name = "quantum.and"
+
+    lhs = operand_def(i1)
+    rhs = operand_def(i1)
+    result = result_def(i1)
+
+    traits = traits_def(Pure())
+    assembly_format = "$lhs `,` $rhs attr-dict"
+
+    def __init__(self, lhs: SSAValue, rhs: SSAValue):
+        super().__init__(
+            operands=[lhs, rhs],
+            result_types=[i1],
+        )
 
 @irdl_op_definition
 class QuantumInitOp(IRDLOperation):
@@ -49,6 +73,28 @@ class QuantumInitOp(IRDLOperation):
             value = IntegerAttr.from_int_and_width(value, 32)
         super().__init__(result_types=[result_type], properties={"value": value})
 
+class QuantumControlledBinaryImmBase(IRDLOperation, abc.ABC):
+    """Base class for controlled binary quantum operations with immediate."""
+
+    T: ClassVar = VarConstraint("T", signlessIntegerLike)
+    lhs = operand_def(T)
+    ctrl = operand_def(i1)
+    result = result_def(T)
+    imm = attr_def(IntegerAttr)
+
+    traits = traits_def(Pure())
+    assembly_format = "$lhs `,` $imm `,` $ctrl `:` type($result) attr-dict"
+
+    def __init__(self, lhs: SSAValue, imm: int | IntegerAttr, ctrl: SSAValue, result_type: Attribute | None = None):
+        if isinstance(imm, int):
+            imm = IntegerAttr.from_int_and_width(imm, 32)
+        if result_type is None:
+            result_type = lhs.type
+        super().__init__(
+            operands=[lhs, ctrl],
+            result_types=[result_type],
+            attributes={"imm": imm}
+        )
 
 class QuantumBinaryBase(IRDLOperation, abc.ABC):
     """Common base for binary arithmetic operations."""
@@ -162,3 +208,142 @@ class QDivSImmOp(QuantumBinaryImmBase):
     """Signed division with an immediate value."""
 
     name = "quantum.divsi_imm"
+
+class QuantumControlledBinaryBase(IRDLOperation, abc.ABC):
+    """Base class for controlled binary quantum operations."""
+
+    T: ClassVar = VarConstraint("T", signlessIntegerLike)
+    lhs = operand_def(T)
+    rhs = operand_def(T)
+    ctrl = operand_def(i1)
+    result = result_def(T)
+
+    traits = traits_def(Pure())
+    assembly_format = "$lhs `,` $rhs `,` $ctrl attr-dict `:` type($result)"
+
+    def __init__(self, lhs: SSAValue, rhs: SSAValue, ctrl: SSAValue, result_type: Attribute | None = None):
+        if result_type is None:
+            result_type = lhs.type
+        super().__init__(operands=[lhs, rhs, ctrl], result_types=[result_type])
+
+
+@irdl_op_definition
+class CQAddiOp(QuantumControlledBinaryBase):
+    """Controlled quantum addition."""
+
+    name = "quantum.c_addi"
+
+
+@irdl_op_definition
+class CQSubiOp(QuantumControlledBinaryBase):
+    """Controlled quantum subtraction."""
+
+    name = "quantum.c_subi"
+
+
+@irdl_op_definition
+class CQMuliOp(QuantumControlledBinaryBase):
+    """Controlled quantum multiplication."""
+
+    name = "quantum.c_muli"
+
+
+@irdl_op_definition
+class CQDivSOp(QuantumControlledBinaryBase):
+    """Controlled quantum signed division."""
+
+    name = "quantum.c_divsi"
+
+@irdl_op_definition
+class QCmpiOp(IRDLOperation):
+    """Quantum comparison producing an i1 result."""
+
+    name = "quantum.cmpi"
+
+    T: ClassVar = VarConstraint("T", signlessIntegerLike)
+    lhs = operand_def(T)
+    rhs = operand_def(T)
+    predicate = prop_def(IntegerAttr)
+    result = result_def(i1)
+
+    traits = traits_def(Pure())
+    assembly_format = "$lhs `,` $rhs `[` $predicate `]` attr-dict `:` type($lhs)"
+
+    def __init__(
+        self,
+        lhs: SSAValue,
+        rhs: SSAValue,
+        predicate: int | IntegerAttr,
+    ):
+        if isinstance(predicate, int):
+            predicate = IntegerAttr.from_int_and_width(predicate, 64)
+        super().__init__(
+            operands=[lhs, rhs],
+            result_types=[i1],
+            properties={"predicate": predicate},
+        )
+
+@irdl_op_definition
+class QNotOp(IRDLOperation):
+    name = "quantum.not"
+
+    operand = operand_def(i1)
+    result = result_def(i1)
+
+    traits = traits_def(Pure())
+    assembly_format = "$operand attr-dict"
+
+    def __init__(self, operand: SSAValue):
+        super().__init__(
+            operands=[operand],
+            result_types=[i1],
+        )
+
+
+@irdl_op_definition
+class QuantumCInitOp(IRDLOperation):
+    """Controlled initialization of a quantum register."""
+    name = "quantum.c_init"
+
+    T: ClassVar = VarConstraint("T", signlessIntegerLike)
+
+    ctrl = operand_def(i1)
+    value = attr_def(IntegerAttr)
+    result = result_def(T)
+
+    traits = traits_def(Pure())
+
+    assembly_format = "`(` $ctrl `)` $value `:` type($result) attr-dict"
+
+
+    def __init__(self, ctrl: SSAValue, value: int | IntegerAttr, result_type: Attribute = i32):
+        if isinstance(value, int):
+            value = IntegerAttr.from_int_and_width(value, 32)
+        super().__init__(
+            operands=[ctrl],
+            result_types=[result_type],
+            attributes={"value": value}
+        )
+
+@irdl_op_definition
+class CQAddiImmOp(QuantumControlledBinaryImmBase):
+    """Controlled quantum addition with immediate."""
+    name = "quantum.c_addi_imm"
+
+
+@irdl_op_definition
+class CQSubiImmOp(QuantumControlledBinaryImmBase):
+    """Controlled quantum subtraction with immediate."""
+    name = "quantum.c_subi_imm"
+
+
+@irdl_op_definition
+class CQMuliImmOp(QuantumControlledBinaryImmBase):
+    """Controlled quantum multiplication with immediate."""
+    name = "quantum.c_muli_imm"
+
+
+@irdl_op_definition
+class CQDivSImmOp(QuantumControlledBinaryImmBase):
+    """Controlled quantum division with immediate."""
+    name = "quantum.c_divsi_imm"

@@ -14,6 +14,12 @@ from __future__ import annotations
 import abc
 from typing import ClassVar
 
+from xdsl.ir import Operation, SSAValue, Block
+from xdsl.irdl import irdl_op_definition, operand_def, attr_def
+from xdsl.dialects.builtin import i1
+from xdsl.traits import Pure
+from xdsl.irdl import successor_def
+
 from xdsl.ir import SSAValue, Attribute
 from xdsl.dialects.builtin import IntegerAttr, IntegerType, IndexType, AnyOf
 from xdsl.irdl import (
@@ -214,7 +220,37 @@ class SubiImmOp(SignlessIntegerBinaryOpWithImmediateAndOverflow):
     def is_right_unit(attr: IntegerAttr) -> bool:
         """Check if ``imm`` is zero."""
         return attr.value.data == 0
+    
+@irdl_op_definition
+class BranchOp(IRDLOperation):
+    name = "cf.br"
 
+    dest = successor_def()
+
+    def __init__(self, dest: Block):
+        super().__init__(successors=[dest])
+
+
+@irdl_op_definition
+class CondBranchOp(IRDLOperation):
+    name = "cf.cond_br"
+
+    cond = operand_def(i1)
+    true_dest = successor_def()
+    false_dest = successor_def()
+
+    def __init__(
+        self,
+        cond: SSAValue,
+        true_block: Block,
+        true_args: list[SSAValue],
+        false_block: Block,
+        false_args: list[SSAValue],
+    ):
+        super().__init__(
+            operands=[cond],
+            successors=[true_block, false_block],
+        )
 
 @irdl_op_definition
 class MuliImmOp(SignlessIntegerBinaryOpWithImmediateAndOverflow):
