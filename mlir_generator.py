@@ -105,6 +105,33 @@ class MLIRGenerator:
 
 
     def lower_if(self, stmt: IfStmt, tail: list) -> None:
+        if isinstance(stmt.condition, BinaryOperator) and stmt.condition.opcode in ("&&", "||"):
+            lhs = stmt.condition.lhs
+            rhs = stmt.condition.rhs
+
+            if stmt.condition.opcode == "&&":
+                nested_if = IfStmt(
+                    condition=rhs,
+                    then_body=stmt.then_body,
+                    else_body=None
+                )
+                outer_if = IfStmt(
+                    condition=lhs,
+                    then_body=CompoundStmt([nested_if]),
+                    else_body=stmt.else_body
+                )
+                self.lower_if(outer_if, tail)
+
+            elif stmt.condition.opcode == "||":
+                # Clone the body for both branches
+                then_copy_1 = stmt.then_body
+                then_copy_2 = stmt.then_body  # You may need to deep copy to prevent reuse
+
+                self.lower_if(IfStmt(condition=lhs, then_body=then_copy_1), tail)
+                self.lower_if(IfStmt(condition=rhs, then_body=then_copy_2), tail)
+            return
+
+        # Fallback: standard if logic
         cond_val = self.process_expression(stmt.condition)
         then_block = Block()
         else_block = Block()
@@ -125,6 +152,7 @@ class MLIRGenerator:
             self._lower_block(stmt.else_body.stmts + tail)
         else:
             self._lower_block(tail)
+
 
     def _lower_block(self, stmts: list) -> None:
         i = 0

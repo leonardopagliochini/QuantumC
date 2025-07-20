@@ -3,14 +3,10 @@ int main() {
     a = 3;
     int b = 0;
     int c = 0;
-    if (a > b)
+    if (a > b || b == 0)
     {
-        if (b == 0)
-        {
-            c = a * 3;
-        }
-        int d = c + a;
+        c = a * 3;
+         
     }
-    b = 6;
     return c;
 }
