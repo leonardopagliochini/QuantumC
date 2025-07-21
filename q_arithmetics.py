@@ -12,6 +12,16 @@ except Exception:  # pragma: no cover - optional dependency
 
 NUMBER_OF_BITS = 4
 
+def unique_reg_name(existing_names, base):
+    """
+    Generate a unique register name not in existing_names starting from base.
+    """
+    idx = 0
+    while f"{base}{idx}" in existing_names:
+        idx += 1
+    return f"{base}{idx}"
+
+
 def set_number_of_bits(n):
     """
     Set the number of bits for two's complement representation.
@@ -711,99 +721,83 @@ def _controlled_invert_in_place(qc, qreg, control):
 
 
 def equal(qc, a_reg, b_reg):
-    """Return a qubit set to ``|1>`` if ``a_reg == b_reg``."""
+    n = max(len(a_reg), len(b_reg))
+    a_pad = pad_register(qc, a_reg, n, "aeq")
+    b_pad = pad_register(qc, b_reg, n, "beq")
 
-    n = len(a_reg)
-    assert len(b_reg) == n
-
-    xor_reg = QuantumRegister(n, name="xor")
+    existing = {reg.name for reg in qc.qregs}
+    xor_name = unique_reg_name(existing, "xor")
+    xor_reg = QuantumRegister(n, name=xor_name)
     qc.add_register(xor_reg)
-    for i in range(n):
-        qc.cx(a_reg[i], xor_reg[i])
-        qc.cx(b_reg[i], xor_reg[i])
 
-    out = QuantumRegister(1, name="eq")
+    for i in range(n):
+        qc.cx(a_pad[i], xor_reg[i])
+        qc.cx(b_pad[i], xor_reg[i])
+
+    eq_name = unique_reg_name(existing | {xor_name}, "eq")
+    out = QuantumRegister(1, name=eq_name)
     qc.add_register(out)
 
-    # out = 1 if all xor_reg bits are 0
-    for qubit in xor_reg:
-        qc.x(qubit)
+    for q in xor_reg:
+        qc.x(q)
     qc.x(out[0])
     qc.mcx(xor_reg, out[0])
     qc.x(out[0])
-    for qubit in xor_reg:
-        qc.x(qubit)
+    for q in xor_reg:
+        qc.x(q)
     return out[0]
 
-
-
 def not_equal(qc, a_reg, b_reg):
-    """
-    Compares a != b and stores result in a single qubit.
-    """
     eq = equal(qc, a_reg, b_reg)
-    neq = QuantumRegister(1, name='neq')
+    existing = {reg.name for reg in qc.qregs}
+    neq_name = unique_reg_name(existing, "neq")
+    neq = QuantumRegister(1, name=neq_name)
     qc.add_register(neq)
-    qc.x(neq[0])       # start in |1>
-    qc.cx(eq, neq[0])  # flip to 0 if eq is 1 → result = not(eq)
+    qc.x(neq[0])
+    qc.cx(eq, neq[0])
     return neq[0]
 
 def less_than(qc, a_reg, b_reg):
-    """
-    Compares a < b (signed) and stores the result in a single qubit.
-    """
-    n = len(a_reg)
-    assert len(b_reg) == n
+    n = max(len(a_reg), len(b_reg))
+    a_pad = pad_register(qc, a_reg, n, "alt")
+    b_pad = pad_register(qc, b_reg, n, "blt")
 
     existing = {reg.name for reg in qc.qregs}
-    idx = 0
-    while f"bneg{idx}" in existing:
-        idx += 1
-    tmp_b = QuantumRegister(n, name=f"bneg{idx}")
+    bneg_name = unique_reg_name(existing, "bneg")
+    tmp_b = QuantumRegister(n, name=bneg_name)
     qc.add_register(tmp_b)
     for i in range(n):
-        qc.cx(b_reg[i], tmp_b[i])
-    invert(qc, tmp_b)  # compute -b
+        qc.cx(b_pad[i], tmp_b[i])
+    invert(qc, tmp_b)
 
-    diff = add(qc, a_reg, tmp_b)
+    diff = add(qc, a_pad, tmp_b)
 
-    existing = {reg.name for reg in qc.qregs}
-    idx = 0
-    while f"lt{idx}" in existing:
-        idx += 1
-    out = QuantumRegister(1, name=f"lt{idx}")
+    lt_name = unique_reg_name({*existing, bneg_name}, "lt")
+    out = QuantumRegister(1, name=lt_name)
     qc.add_register(out)
-    qc.cx(diff[n - 1], out[0])  # MSB = 1 → negative → a < b
+    qc.cx(diff[n - 1], out[0])
 
-    invert(qc, tmp_b)  # restore b
+    invert(qc, tmp_b)
     return out[0]
 
 def greater_than(qc, a_reg, b_reg):
-    """Return a qubit set to ``|1>`` if ``a_reg`` is strictly greater than ``b_reg``."""
-
     return less_than(qc, b_reg, a_reg)
 
 def less_equal(qc, a_reg, b_reg):
-    """
-    Compares a <= b and returns a single qubit with result.
-    """
     gt = greater_than(qc, a_reg, b_reg)
-    le = QuantumRegister(1, name='le')
+    existing = {reg.name for reg in qc.qregs}
+    le_name = unique_reg_name(existing, "le")
+    le = QuantumRegister(1, name=le_name)
     qc.add_register(le)
-    qc.x(le[0])       # start in |1>
-    qc.cx(gt, le[0])  # flip to 0 if gt is 1 → a <= b ⇔ not (a > b)
+    qc.x(le[0])
+    qc.cx(gt, le[0])
     return le[0]
 
 def greater_equal(qc, a_reg, b_reg):
-    """
-    Compares a >= b and returns a single qubit with result.
-    """
     lt = less_than(qc, a_reg, b_reg)
     existing = {reg.name for reg in qc.qregs}
-    idx = 0
-    while f"ge{idx}" in existing:
-        idx += 1
-    ge = QuantumRegister(1, name=f"ge{idx}")
+    ge_name = unique_reg_name(existing, "ge")
+    ge = QuantumRegister(1, name=ge_name)
     qc.add_register(ge)
     qc.x(ge[0])
     qc.cx(lt, ge[0])
@@ -815,6 +809,56 @@ def measure_single(qc, qubit, name="result"):
     creg = ClassicalRegister(1, name=name)
     qc.add_register(creg)
     qc.measure(qubit, creg[0])
+
+def initialize_bit(qc, value, name=None):
+    """
+    Initialize a single qubit to |0⟩ or |1⟩ based on a classical bit value.
+
+    Args:
+        qc (QuantumCircuit): The quantum circuit to modify.
+        value (int): Bit value (0 or 1).
+        name (str, optional): Name of the qubit register.
+
+    Returns:
+        Qubit: Initialized qubit (|value⟩).
+    """
+    if value not in (0, 1):
+        raise ValueError("Bit value must be 0 or 1.")
+
+    existing = {reg.name for reg in qc.qregs}
+    idx = 0
+    base_name = "qb" if name is None else name
+    while f"{base_name}{idx}" in existing:
+        idx += 1
+    reg = QuantumRegister(1, name=f"{base_name}{idx}")
+    qc.add_register(reg)
+
+    if value == 1:
+        qc.x(reg[0])
+
+    return reg[0]
+
+def pad_register(qc, reg, target_size, name_hint="pad"):
+    """
+    Pad a quantum register with |0⟩ qubits to reach target size.
+
+    Args:
+        qc (QuantumCircuit): The circuit to modify.
+        reg (QuantumRegister): The quantum register to pad.
+        target_size (int): Desired final size.
+        name_hint (str): Prefix for naming new register.
+
+    Returns:
+        list[Qubit]: List of qubits padded to length `target_size`.
+    """
+    padded = list(reg)
+    extra = target_size - len(reg)
+    if extra > 0:
+        pad_reg = QuantumRegister(extra, name=f"{name_hint}_ext")
+        qc.add_register(pad_reg)
+        padded += list(pad_reg)
+    return padded
+
 
 def measure(qc, qreg):
     """
@@ -868,6 +912,54 @@ def simulate(qc, shots=1024):
 
     return signed
 
+def logical_and(qc, q1, q2):
+    """
+    Compute logical AND between two qubits.
+
+    Args:
+        qc (QuantumCircuit): The quantum circuit to modify.
+        q1 (Qubit): First input qubit.
+        q2 (Qubit): Second input qubit.
+
+    Returns:
+        Qubit: Output qubit set to |1> iff q1 == 1 and q2 == 1
+    """
+    existing = {reg.name for reg in qc.qregs}
+    idx = 0
+    while f"and{idx}" in existing:
+        idx += 1
+    and_reg = QuantumRegister(1, name=f"and{idx}")
+    qc.add_register(and_reg)
+    qc.ccx(q1, q2, and_reg[0])
+    return and_reg[0]
+
+def logical_or(qc, q1, q2):
+    """
+    Compute logical OR between two qubits.
+
+    Args:
+        qc (QuantumCircuit): The quantum circuit to modify.
+        q1 (Qubit): First input qubit.
+        q2 (Qubit): Second input qubit.
+
+    Returns:
+        Qubit: Output qubit set to |1> iff q1 == 1 or q2 == 1
+    """
+    existing = {reg.name for reg in qc.qregs}
+    idx = 0
+    while f"or{idx}" in existing:
+        idx += 1
+    or_reg = QuantumRegister(1, name=f"or{idx}")
+    qc.add_register(or_reg)
+
+    qc.x(or_reg[0])        # initialize in |1>
+    # Use De Morgan: q1 OR q2 = NOT (NOT q1 AND NOT q2)
+    qc.x(q1)
+    qc.x(q2)
+    qc.ccx(q1, q2, or_reg[0])
+    qc.x(q1)
+    qc.x(q2)
+    return or_reg[0]
 
 
 

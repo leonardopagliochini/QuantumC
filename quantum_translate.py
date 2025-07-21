@@ -638,14 +638,13 @@ class QuantumTranslator:
                 inverted_reg = self.allocate_reg()
                 false_ctrl = self.emit_value(op.operands[0])
                 # Invert control using: not x ≈ x xor 1
-                from xdsl.dialects.builtin import IntegerAttr
-                one_val = self.emit_controlled_init(ctrl=cond_val, value=1)
-                one_val.name_hint = f"q{self.next_reg - 1}_0"
-                inverted = QAddiOp(false_ctrl, one_val)  # XOR behavior: x + 1 mod 2
+                inverted = QNotOp(cond_val)
                 self.current_block.add_op(inverted)
+                inverted_reg = self.allocate_reg()
                 inverted.results[0].name_hint = f"q{inverted_reg}_0"
-                self.reg_ssa[inverted_reg] = inverted.results[0]
                 self.reg_version[inverted_reg] = 0
+                self.reg_ssa[inverted_reg] = inverted.results[0]
+
 
                 # Push inverted condition for 'else'
                 self.control_stack.append(inverted.results[0])
@@ -684,4 +683,5 @@ class QuantumTranslator:
         # Construct the function with the same signature as the original but
         # containing the newly built block of quantum operations.
         func_type = ([i32] * len(func.function_type.inputs.data), [i32])
+        
         return FuncOp(func.sym_name.data, func_type, Region([self.current_block]))
