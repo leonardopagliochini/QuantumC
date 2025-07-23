@@ -26,7 +26,7 @@ from pipeline import QuantumIR
 class QuantumCircuitPipeline(QuantumIR):
     """Extended pipeline creating a :class:`.QuantumCircuit`."""
 
-    def __init__(self, json_path: str = "json_out/try.json", output_dir: str = "output", num_bits: int = 8, verbose: bool = False) -> None:
+    def __init__(self, json_path: str = "json_out/try.json", output_dir: str = "output", num_bits: int = 16, verbose: bool = False) -> None:
         super().__init__(json_path=json_path, output_dir=output_dir)
         self.num_bits = num_bits
         self.verbose = verbose
@@ -186,11 +186,20 @@ class QuantumCircuitPipeline(QuantumIR):
             raise RuntimeError("Must call run_generate_circuit first")
         path = os.path.join(self.output_dir, filename)
         os.makedirs(self.output_dir, exist_ok=True)
-        from qiskit import qasm2
+
+        from qiskit import qasm2, transpile
+
+        # Transpile without specifying backend, but constrain basis gates to QASM2
+        basis_gates = ["u1", "u2", "u3", "cx", "id", "measure", "reset"]
+        transpiled_circuit = transpile(self.circuit, basis_gates=basis_gates)
+
         with open(path, "w") as f:
-            f.write(qasm2.dumps(self.circuit))
+            f.write(qasm2.dumps(transpiled_circuit))
         print(f"QASM circuit written to {path}")
+
         return path
+
+
 
 
 def main() -> None:

@@ -4,7 +4,9 @@ from xdsl.dialects.func import FuncOp, ReturnOp
 from xdsl.dialects.arith import ConstantOp, AddiOp, SubiOp, MuliOp, DivSIOp, CmpiOp
 from dialect_ops import CondBranchOp, BranchOp, AddiImmOp, SubiImmOp, MuliImmOp, DivSImmOp
 from c_ast import Expression, IntegerLiteral, DeclRef, BinaryOperator, BinaryOperatorWithImmediate
-from c_ast import VarDecl, AssignStmt, ReturnStmt, FunctionDecl, CompoundStmt, IfStmt
+from c_ast import VarDecl, AssignStmt, ReturnStmt, FunctionDecl, CompoundStmt, IfStmt, ForStmt
+
+MAX_UNROLL = 10
 
 class MLIRGenerator:
     def __init__(self) -> None:
@@ -12,31 +14,6 @@ class MLIRGenerator:
         self.current_block: Block | None = None
         self.function_region: Region | None = None
 
-    # def process_expression(self, expr: Expression) -> SSAValue:
-    #     if isinstance(expr, IntegerLiteral):
-    #         op = ConstantOp.from_int_and_width(expr.value, 32)
-    #         self.current_block.add_op(op)
-    #         return op.results[0]
-    #     if isinstance(expr, DeclRef):
-    #         if expr.name not in self.symbol_table or self.symbol_table[expr.name] is None:
-    #             raise ValueError(f"Use of undeclared or uninitialized variable '{expr.name}'")
-    #         return self.symbol_table[expr.name]
-    #     if isinstance(expr, (BinaryOperator, BinaryOperatorWithImmediate)):
-    #         lhs_val = self.process_expression(expr.lhs)
-    #         rhs_val = self.process_expression(expr.rhs)
-    #         arith_map = {'+': AddiOp, '-': SubiOp, '*': MuliOp, '/': DivSIOp}
-    #         cmp_map = {'==': "eq", '!=': "ne", '<': "slt", '<=': "sle", '>': "sgt", '>=': "sge"}
-    #         if expr.opcode in arith_map:
-    #             op = arith_map[expr.opcode](lhs_val, rhs_val)
-    #             self.current_block.add_op(op)
-    #             return op.results[0]
-    #         elif expr.opcode in cmp_map:
-    #             op = CmpiOp(lhs_val, rhs_val, cmp_map[expr.opcode])
-    #             self.current_block.add_op(op)
-    #             return op.results[0]
-    #         raise ValueError(f"Unsupported operator: {expr.opcode}")
-    #     raise TypeError(f"Unsupported expression type: {type(expr)}")
-    
     def process_expression(self, expr: Expression) -> SSAValue:
         if isinstance(expr, IntegerLiteral):
             op = ConstantOp.from_int_and_width(expr.value, 32)
@@ -65,11 +42,6 @@ class MLIRGenerator:
             raise ValueError(f"Unsupported binary operator: {expr.opcode}")
 
         if isinstance(expr, BinaryOperatorWithImmediate):
-            lhs_val = self.process_expression(expr.lhs)
-            imm_val = expr.rhs.value if isinstance(expr.rhs, IntegerLiteral) else None
-            if imm_val is None:
-                raise ValueError("Immediate value must be an integer literal")
-
             arith_map = {
                 '+': AddiImmOp,
                 '-': SubiImmOp,
@@ -86,22 +58,39 @@ class MLIRGenerator:
                 '>=': "sge",
             }
 
-            if expr.opcode in arith_map:
-                op = arith_map[expr.opcode](lhs_val, imm_val)
-                self.current_block.add_op(op)
-                return op.results[0]
-            
-            elif expr.opcode in cmp_map:
-                # Simula il confronto con una costante creando prima una costante
-                const_op = ConstantOp.from_int_and_width(imm_val, 32)
-                self.current_block.add_op(const_op)
-                rhs_val = const_op.results[0]
-                cmp_op = CmpiOp(lhs_val, rhs_val, cmp_map[expr.opcode])
-                self.current_block.add_op(cmp_op)
-                return cmp_op.results[0]
+            # caso: immediato a sinistra
+            if isinstance(expr.lhs, IntegerLiteral):
+                imm_val = expr.lhs.value
+                rhs_val = self.process_expression(expr.rhs)
 
-        raise ValueError(f"Unsupported immediate binary operator: {expr.opcode}")
+                if expr.opcode in ('+', '*'):  # commutativi
+                    op = arith_map[expr.opcode](rhs_val, imm_val)
+                    self.current_block.add_op(op)
+                    return op.results[0]
+                else:
+                    raise ValueError(f"Unsupported lhs-immediate for non-commutative op: {expr.opcode}")
 
+            # caso: immediato a destra
+            elif isinstance(expr.rhs, IntegerLiteral):
+                lhs_val = self.process_expression(expr.lhs)
+                imm_val = expr.rhs.value
+
+                if expr.opcode in arith_map:
+                    op = arith_map[expr.opcode](lhs_val, imm_val)
+                    self.current_block.add_op(op)
+                    return op.results[0]
+                
+                elif expr.opcode in cmp_map:
+                    const_op = ConstantOp.from_int_and_width(imm_val, 32)
+                    self.current_block.add_op(const_op)
+                    rhs_val = const_op.results[0]
+                    cmp_op = CmpiOp(lhs_val, rhs_val, cmp_map[expr.opcode])
+                    self.current_block.add_op(cmp_op)
+                    return cmp_op.results[0]
+
+            raise ValueError("BinaryOperatorWithImmediate must contain an IntegerLiteral on one side")
+
+        raise TypeError(f"Unsupported expression type: {type(expr)}")
 
 
     def lower_if(self, stmt: IfStmt, tail: list) -> None:
@@ -123,15 +112,13 @@ class MLIRGenerator:
                 self.lower_if(outer_if, tail)
 
             elif stmt.condition.opcode == "||":
-                # Clone the body for both branches
                 then_copy_1 = stmt.then_body
-                then_copy_2 = stmt.then_body  # You may need to deep copy to prevent reuse
+                then_copy_2 = stmt.then_body  # Optional: deepcopy if necessary
 
                 self.lower_if(IfStmt(condition=lhs, then_body=then_copy_1), tail)
                 self.lower_if(IfStmt(condition=rhs, then_body=then_copy_2), tail)
             return
 
-        # Fallback: standard if logic
         cond_val = self.process_expression(stmt.condition)
         then_block = Block()
         else_block = Block()
@@ -153,6 +140,40 @@ class MLIRGenerator:
         else:
             self._lower_block(tail)
 
+    def lower_for(self, stmt: ForStmt, tail: list) -> None:
+        if isinstance(stmt.init, VarDecl):
+            self.symbol_table[stmt.init.name] = self.process_expression(stmt.init.init)
+        elif isinstance(stmt.init, AssignStmt):
+            self.symbol_table[stmt.init.name] = self.process_expression(stmt.init.value)
+
+        cond_val = self.process_expression(stmt.condition)
+        then_block = Block()
+        else_block = Block()
+        self.function_region.add_block(then_block)
+        self.function_region.add_block(else_block)
+        self.current_block.add_op(CondBranchOp(cond_val, then_block, [], else_block, []))
+
+        self.current_block = else_block
+        self._lower_block(tail)
+
+        for _ in range(MAX_UNROLL):
+            self.current_block = then_block
+            self._lower_block(stmt.body.stmts)
+
+            if stmt.increment:
+                self.symbol_table[stmt.increment.name] = self.process_expression(stmt.increment.value)
+
+            cond_val = self.process_expression(stmt.condition)
+            next_then = Block()
+            next_else = Block()
+            self.function_region.add_block(next_then)
+            self.function_region.add_block(next_else)
+            self.current_block.add_op(CondBranchOp(cond_val, next_then, [], next_else, []))
+
+            self.current_block = next_else
+            self._lower_block(tail)
+
+            then_block = next_then
 
     def _lower_block(self, stmts: list) -> None:
         i = 0
@@ -160,6 +181,9 @@ class MLIRGenerator:
             stmt = stmts[i]
             if isinstance(stmt, IfStmt):
                 self.lower_if(stmt, stmts[i+1:])
+                return
+            elif isinstance(stmt, ForStmt):
+                self.lower_for(stmt, stmts[i+1:])
                 return
             elif isinstance(stmt, VarDecl):
                 self.symbol_table[stmt.name] = self.process_expression(stmt.init) if stmt.init else None

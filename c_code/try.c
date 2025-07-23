@@ -1,15 +1,9 @@
 int main() {
     int a;
-    a = 3;
-    int b = 0;
-    int c = 0;
-    if (a > b)
+    a = 2;
+    for (int i = 0 ; i < 3; i = i + 1)
     {
-        c = a + 3;    
+        a = a * 2;
     }
-    if (c > a)
-    {
-        b = 2;
-    }
-    return c;
+    return a;
 }

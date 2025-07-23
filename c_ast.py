@@ -110,6 +110,14 @@ class IfStmt:
     then_body: CompoundStmt
     else_body: Optional[CompoundStmt] = None
 
+@dataclass
+class ForStmt:
+    init: Optional[Union[VarDecl, AssignStmt]]
+    condition: Optional[Expression]
+    increment: Optional[AssignStmt]
+    body: CompoundStmt
+
+
 
 # -----------------------------------------------------------------------------
 # Expression Parsing
@@ -175,6 +183,7 @@ def parse_expression(expr_node: Dict) -> Expression:
         # The operand is usually wrapped in an ImplicitCastExpr — you already strip that.
         operand_expr = parse_expression(expr_node["inner"][0])
         return UnaryOperator(opcode, operand_expr)
+        
 
 
     raise ValueError(f"Unsupported expression node: {kind}")
@@ -280,6 +289,25 @@ def parse_statement(stmt: Dict) -> Optional[Union[VarDecl, AssignStmt, ReturnStm
                         else_block.stmts.append(parsed)
 
         return IfStmt(condition, then_block, else_block)
+    
+    elif kind == "ForStmt":
+        inner = stmt.get("inner", [])
+
+        # Filtra solo gli elementi che hanno 'kind'
+        real_inner = [x for x in inner if isinstance(x, dict) and 'kind' in x]
+
+        init_stmt = parse_statement(real_inner[0]) if len(real_inner) > 0 else None
+        condition_expr = parse_expression(real_inner[1]) if len(real_inner) > 1 else None
+        increment_stmt = parse_statement(real_inner[2]) if len(real_inner) > 2 else None
+
+        body = CompoundStmt()
+        if len(real_inner) > 3 and real_inner[3].get("kind") == "CompoundStmt":
+            for s in real_inner[3].get("inner", []):
+                parsed = parse_statement(s)
+                if parsed:
+                    body.stmts.append(parsed)
+
+        return ForStmt(init_stmt, condition_expr, increment_stmt, body)
 
     return None
 
@@ -324,6 +352,33 @@ def pretty_print_statement(stmt, indent=1) -> List[str]:
             for inner in stmt.else_body.stmts:
                 lines.extend(pretty_print_statement(inner, indent + 1))
             lines.append(f"{indent_str}}}")
+    
+    elif isinstance(stmt, ForStmt):
+        # Print init (either VarDecl or AssignStmt)
+        if isinstance(stmt.init, VarDecl):
+            init_str = f"int {stmt.init.name} = {pretty_print_expression(stmt.init.init)}" if stmt.init.init else f"int {stmt.init.name}"
+        elif isinstance(stmt.init, AssignStmt):
+            init_str = f"{stmt.init.name} = {pretty_print_expression(stmt.init.value)}"
+        else:
+            init_str = ''
+
+        # Print condition
+        cond_str = pretty_print_expression(stmt.condition) if stmt.condition else ''
+
+        # Print increment (must be an AssignStmt)
+        if isinstance(stmt.increment, AssignStmt):
+            incr_str = f"{stmt.increment.name} = {pretty_print_expression(stmt.increment.value)}"
+        else:
+            incr_str = ''
+
+        # Emit the for loop
+        lines.append(f"{indent_str}for ({init_str}; {cond_str}; {incr_str}) {{")
+        for inner in stmt.body.stmts:
+            lines.extend(pretty_print_statement(inner, indent + 1))
+        lines.append(f"{indent_str}}}")
+
+
+    
 
     else:
         lines.append(f"{indent_str}// Unsupported statement: {type(stmt).__name__}")

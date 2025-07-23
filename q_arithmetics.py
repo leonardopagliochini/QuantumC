@@ -854,10 +854,13 @@ def pad_register(qc, reg, target_size, name_hint="pad"):
     padded = list(reg)
     extra = target_size - len(reg)
     if extra > 0:
-        pad_reg = QuantumRegister(extra, name=f"{name_hint}_ext")
+        existing = {r.name for r in qc.qregs}
+        unique_name = unique_reg_name(existing, f"{name_hint}_ext")
+        pad_reg = QuantumRegister(extra, name=unique_name)
         qc.add_register(pad_reg)
         padded += list(pad_reg)
     return padded
+
 
 
 def measure(qc, qreg):
@@ -883,7 +886,7 @@ def simulate(qc, shots=1024):
     """
     if AerSimulator is not None:
         backend = AerSimulator(method="matrix_product_state")
-        transpiled = transpile(qc, backend)
+        transpiled = qc
     else:
         backend = BasicSimulator()
         transpiled = transpile(qc, backend)
