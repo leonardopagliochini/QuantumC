@@ -17,10 +17,6 @@ also includes tools to generate quantum circuits from the translated IR.
   the test C sources.
 - [`run_all_pipeline.py`](./run_all_pipeline.py) – runs the pipeline on every
   JSON file under `json_out` and stores the MLIR output.
-- [`test_all_c_files_to_fix.py`](./test_all_c_files_to_fix.py) and
-  [`test_mlir_equivalence_to_fix.py`](./test_mlir_equivalence_to_fix.py) – test
-  helpers that check the pipeline on all examples and verify that classical and
-  quantum MLIR behave the same.
 
 ## Source files
 
@@ -45,8 +41,6 @@ also includes tools to generate quantum circuits from the translated IR.
   Qiskit for arithmetic operations on quantum registers.
 - [`q_arithmetics_controlled.py`](./q_arithmetics_controlled.py) – controlled
   versions of the same operations.
-- [`circuit_pipeline.py`](./circuit_pipeline.py) – combines the pipeline with the
-  Qiskit helpers to build a circuit from the quantum dialect.
 
 ### Utility scripts
 
@@ -54,11 +48,6 @@ also includes tools to generate quantum circuits from the translated IR.
   IR for the C test files with loop unrolling.
 - [`astJsonGen.py`](./astJsonGen.py) – runs `clang -ast-dump=json` on every C
   source in a folder.
-- [`generate_ast.py`](./generate_ast.py) – convenience wrapper around the above.
-- [`generate_llvm.py`](./generate_llvm.py) – convenience wrapper around
-  `llvmIrGen.py`.
-- [`run_all_pipeline.py`](./run_all_pipeline.py) – executes `QuantumIR` on all
-  available JSON files and writes the resulting MLIR modules.
 
 ### Tests
 
@@ -80,22 +69,18 @@ also includes tools to generate quantum circuits from the translated IR.
 - [`c_code/main`](./c_code/main) – another compiled binary accompanying the test
   sources.
 
-### Documentation
-
-- [`docs/code_structure.md`](./docs/code_structure.md) – short overview of the
-  modules and the typical compilation flow.
-- [`docs/compilationProcess.md`](./docs/compilationProcess.md) – notes and links
-  about compiler phases and how to reproduce Clang commands.
-
 ### Miscellaneous
 
 - [`check_circuits.ipynb`](./check_circuits.ipynb) – Jupyter notebook with
   experiments for verifying generated circuits.
+- [`Readings_all/`](./Readings_all/) – collection of research papers related to
+  quantum compilation.
 - [`qvenv/`](./qvenv/) – Python virtual environment containing third‑party
   dependencies. It is not required to understand the project logic.
 - [`.gitignore`](./.gitignore) – lists files and folders excluded from version
   control.
 - [`.DS_Store`](./.DS_Store) – macOS metadata file.
+
 
 ## How it all fits together
 
@@ -110,9 +95,9 @@ also includes tools to generate quantum circuits from the translated IR.
    interpreting the quantum MLIR with Qiskit helpers from
    `q_arithmetics.py` and `q_arithmetics_controlled.py` to produce a
    `QuantumCircuit`.
-5. **Testing** – the scripts under `tests` generate MLIR for all sample programs
-   and verify that the classical and quantum variants compute the same results
-   using the interpreters defined in the test helpers.
+5. **Testing** – `test_all_c_files_to_fix.py` regenerates JSON and MLIR for all
+   example sources, while `test_mlir_equivalence_to_fix.py` loads those modules
+   and checks that classical and quantum executions produce identical results.
 
 This overview should help navigate every file in the repository and understand
 how the pieces interact to form a simple C‑to‑quantum compilation pipeline.
