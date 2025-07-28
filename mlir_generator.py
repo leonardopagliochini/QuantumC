@@ -41,9 +41,7 @@ class MLIRGenerator:
                 self.current_block.add_op(zero)
                 cmp = CmpiOp(operand_val, zero.results[0], "eq")
                 self.current_block.add_op(cmp)
-                ext = ExtUIOp(cmp.results[0], i32)
-                self.current_block.add_op(ext)
-                return ext.results[0]
+                return cmp.results[0]
             if expr.opcode == '~':
                 zero = ConstantOp.from_int_and_width(0, 32)
                 one = ConstantOp.from_int_and_width(1, 32)

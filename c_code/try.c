@@ -1,9 +1,13 @@
 int main() {
-    int a;
-    a = 2;
-    for (int i = 0 ; i < 3; i = i + 1)
-    {
-        a = a * 2;
-    }
-    return a;
+    int x = 5;
+    int y = -x;     // unary minus
+    int z = +y;     // unary plus (no-op)
+    ++x;            // pre-increment
+    --y;            // pre-decrement
+    int a = x++;    // post-increment
+    int b = y--;    // post-decrement
+    int c = !0;     // logical NOT
+    int f = 12;
+    int d = ~f;     // bitwise NOT
+    return x + y + a + b + d + z;
 }
