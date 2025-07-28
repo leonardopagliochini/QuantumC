@@ -209,6 +209,20 @@ class QuantumTranslator:
             self.reg_version[reg] = 0
             self.val_info[op.results[0]] = ValueInfo(reg, 0, ("binaryimm", (opcode, lhs, imm)))
 
+        elif op.name == "arith.extui":
+            (src,) = op.operands
+            q_src = self.emit_value(src)
+            ctrl = self.get_current_control()
+            if ctrl is not None:
+                combined = self.combine_controls([ctrl, q_src])
+                res = self.emit_controlled_init(combined, 1)
+            else:
+                res = self.emit_controlled_init(q_src, 1)
+            reg = self.next_reg - 1
+            self.val_info[op.results[0]] = ValueInfo(reg, 0, ("extui", src))
+            return
+
+
         else:
             raise NotImplementedError(f"Unsupported op {op.name}")
 
@@ -674,6 +688,21 @@ class QuantumTranslator:
                 cmp_op.results[0].name_hint = f"q{reg}_0"
                 self.val_info[op.results[0]] = ValueInfo(reg, 0, ("cmpi", lhs, rhs, predicate))
                 self.reg_ssa[reg] = cmp_op.results[0]
+
+            elif op.name == "arith.extui":
+                (src,) = op.operands
+                remaining[src] -= 1
+                q_src = self.emit_value(src)
+                ctrl = self.get_current_control()
+                if ctrl is not None:
+                    combined = self.combine_controls([ctrl, q_src])
+                    res = self.emit_controlled_init(combined, 1)
+                else:
+                    res = self.emit_controlled_init(q_src, 1)
+                reg = self.next_reg - 1
+                self.val_info[op.results[0]] = ValueInfo(reg, 0, ("extui", src))
+                self.reg_ssa[reg] = res
+
 
 
             else:

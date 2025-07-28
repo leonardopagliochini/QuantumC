@@ -57,7 +57,7 @@ The parser recognizes the following features:
   division (`+`, `-`, `*`, `/`).
 - **Comparisons** – equality and relational operators (`==`, `!=`, `<`, `<=`,
   `>`, `>=`).
-- **Unary operators** – negation (`-`), logical NOT (`!`) and bitwise NOT (`~`).
+ - **Unary operators** – unary plus, negation (`-`), logical NOT (`!`), bitwise NOT (`~`), and pre/post increment/decrement.
 - **Assignments** and **variable declarations** with optional initializers.
 - **`if` statements** including chained `else if` and `else` branches.
 - **`for` loops** with explicit initialization, condition and increment.

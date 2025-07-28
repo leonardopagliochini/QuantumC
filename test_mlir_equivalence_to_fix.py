@@ -13,7 +13,7 @@ from xdsl.interpreters.builtin import BuiltinFunctions
 from xdsl.interpreters.cf import CfFunctions
 from xdsl.dialects.builtin import Builtin
 from xdsl.dialects.func import Func
-from xdsl.dialects.arith import Arith
+from xdsl.dialects.arith import Arith, ExtUIOp
 from xdsl.dialects.cf import Cf
 from xdsl.ir import Dialect
 
@@ -112,6 +112,24 @@ class CustomFunctions(InterpreterFunctions):
     def run_and(self, _, __, args): return (int(bool(args[0]) and bool(args[1])),)
     @impl(QNotOp)
     def run_not(self, _, __, args): return (int(not bool(args[0])),)
+    @impl(ExtUIOp)
+    def run_extui(self, _, __, args): return (int(args[0]),)
+    @impl(CQAddiImmOp)
+    def run_cqaddi_imm(self, _, op, args):
+        lhs, ctrl = args
+        return (lhs + op.imm.value.data if ctrl else lhs,)
+    @impl(CQSubiImmOp)
+    def run_cqsubi_imm(self, _, op, args):
+        lhs, ctrl = args
+        return (lhs - op.imm.value.data if ctrl else lhs,)
+    @impl(CQMuliImmOp)
+    def run_cqmuli_imm(self, _, op, args):
+        lhs, ctrl = args
+        return (lhs * op.imm.value.data if ctrl else lhs,)
+    @impl(CQDivSImmOp)
+    def run_cqdivs_imm(self, _, op, args):
+        lhs, ctrl = args
+        return (lhs // op.imm.value.data if ctrl and op.imm.value.data != 0 else lhs,)
     @impl(QCmpiOp)
     def run_cmp(self, _, op, args):
         lhs, rhs = args

@@ -1,9 +1,10 @@
 from xdsl.ir import Block, Region, SSAValue
 from xdsl.dialects.builtin import i32
 from xdsl.dialects.func import FuncOp, ReturnOp
-from xdsl.dialects.arith import ConstantOp, AddiOp, SubiOp, MuliOp, DivSIOp, CmpiOp
-from dialect_ops import CondBranchOp, BranchOp, AddiImmOp, SubiImmOp, MuliImmOp, DivSImmOp
-from c_ast import Expression, IntegerLiteral, DeclRef, BinaryOperator, BinaryOperatorWithImmediate
+from xdsl.dialects.arith import ConstantOp, AddiOp, SubiOp, MuliOp, DivSIOp, CmpiOp, ExtUIOp
+from dialect_ops import AddiImmOp, SubiImmOp, MuliImmOp, DivSImmOp
+from xdsl.dialects.cf import ConditionalBranchOp as CondBranchOp
+from c_ast import Expression, IntegerLiteral, DeclRef, BinaryOperator, BinaryOperatorWithImmediate, UnaryOperator
 from c_ast import VarDecl, AssignStmt, ReturnStmt, FunctionDecl, CompoundStmt, IfStmt, ForStmt
 
 MAX_UNROLL = 10
@@ -24,6 +25,48 @@ class MLIRGenerator:
             if expr.name not in self.symbol_table or self.symbol_table[expr.name] is None:
                 raise ValueError(f"Use of undeclared or uninitialized variable '{expr.name}'")
             return self.symbol_table[expr.name]
+
+        if isinstance(expr, UnaryOperator):
+            operand_val = self.process_expression(expr.operand)
+            if expr.opcode == '+':
+                return operand_val
+            if expr.opcode == '-':
+                zero = ConstantOp.from_int_and_width(0, 32)
+                self.current_block.add_op(zero)
+                op = SubiOp(zero.results[0], operand_val)
+                self.current_block.add_op(op)
+                return op.results[0]
+            if expr.opcode == '!':
+                zero = ConstantOp.from_int_and_width(0, 32)
+                self.current_block.add_op(zero)
+                cmp = CmpiOp(operand_val, zero.results[0], "eq")
+                self.current_block.add_op(cmp)
+                ext = ExtUIOp(cmp.results[0], i32)
+                self.current_block.add_op(ext)
+                return ext.results[0]
+            if expr.opcode == '~':
+                zero = ConstantOp.from_int_and_width(0, 32)
+                one = ConstantOp.from_int_and_width(1, 32)
+                self.current_block.add_op(zero)
+                self.current_block.add_op(one)
+                neg = SubiOp(zero.results[0], operand_val)
+                self.current_block.add_op(neg)
+                res = SubiOp(neg.results[0], one.results[0])
+                self.current_block.add_op(res)
+                return res.results[0]
+            if expr.opcode in ('++', '--'):
+                if not isinstance(expr.operand, DeclRef):
+                    raise ValueError("Increment/decrement requires variable reference")
+                var_name = expr.operand.name
+                imm = 1
+                if expr.opcode == '++':
+                    op = AddiImmOp(operand_val, imm)
+                else:
+                    op = SubiImmOp(operand_val, imm)
+                self.current_block.add_op(op)
+                self.symbol_table[var_name] = op.results[0]
+                return operand_val if expr.is_postfix else op.results[0]
+            raise ValueError(f"Unsupported unary operator: {expr.opcode}")
 
         if isinstance(expr, BinaryOperator):
             lhs_val = self.process_expression(expr.lhs)

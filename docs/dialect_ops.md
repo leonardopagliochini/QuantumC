@@ -112,7 +112,7 @@ The overall compiler currently recognises a minimal subset of C constructs:
 * Binary arithmetic operators `+`, `-`, `*`, and `/` with optional constant
   operand (mapped to the immediate ops described above).
 * Comparison operators `==`, `!=`, `<`, `<=`, `>`, `>=`.
-* Unary operators such as logical and arithmetic negation.
+* Unary operators including `+`, `-`, `++`, `--`, `!` and `~`.
 * Variable declarations and assignments.
 * Structured control flow via `if` statements and `for` loops.
 * Functions returning a single integer value.
