@@ -129,7 +129,6 @@ creates new state and obsolete values can be recomputed on demand.
 - Quantum operations are emitted in a purely classical simulation manner:
   actual quantum circuit synthesis is performed later by
   `q_arithmetics.py`.
-- Unary operators are parsed but currently not lowered nor translated.
 
 Despite these constraints, the pipeline is sufficient to map small imperative C
 fragments onto a sequence of quantum register manipulations while preserving the

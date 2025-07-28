@@ -58,9 +58,14 @@ class BinaryOperatorWithImmediate(Expression):
 
 @dataclass
 class UnaryOperator(Expression):
-    """Unary operation like -x, !x, or ~x."""
+    """Unary operation like ``-x`` or ``x++``.
+
+    ``is_postfix`` distinguishes prefix from postfix forms for ``++`` and ``--``.
+    For all other operators the flag is ignored.
+    """
     opcode: str
     operand: Expression
+    is_postfix: bool = False
 
 @dataclass
 class VarDecl:
@@ -180,9 +185,10 @@ def parse_expression(expr_node: Dict) -> Expression:
     # unary operations
     if kind == "UnaryOperator":
         opcode = expr_node["opcode"]
-        # The operand is usually wrapped in an ImplicitCastExpr — you already strip that.
+        # The operand is usually wrapped in an ImplicitCastExpr — strip it.
         operand_expr = parse_expression(expr_node["inner"][0])
-        return UnaryOperator(opcode, operand_expr)
+        is_postfix = expr_node.get("isPostfix", False)
+        return UnaryOperator(opcode, operand_expr, is_postfix)
         
 
 
@@ -423,7 +429,10 @@ def pretty_print_expression(expr: Expression) -> str:
     # Unary operations
     if isinstance(expr, UnaryOperator):
         operand = pretty_print_expression(expr.operand)
-        return f"({expr.opcode}{operand})"
+        if expr.is_postfix:
+            return f"({operand}{expr.opcode})"
+        else:
+            return f"({expr.opcode}{operand})"
     # Standard binary operator using infix notation.
     if isinstance(expr, BinaryOperator):
         lhs = pretty_print_expression(expr.lhs)

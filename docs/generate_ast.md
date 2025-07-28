@@ -59,7 +59,7 @@ Only a restricted portion of C is handled by the current pipeline. The dataclass
 * **`if` statements** including optional `else` blocks and cascading `else if` forms.
 * **`for` loops** with initialization, condition, increment, and a compound body. Loop bodies are unrolled in MLIR generation up to a fixed bound (`MAX_UNROLL` in `mlir_generator.py`).
 
-Unary operators are parsed but currently lack lowering support and thus should not be used in the examples. All variables and operations operate on `int` values; other types are unsupported.
+Unary operators such as `+`, `-`, `++`, `--`, `!` and `~` are fully supported. All variables and operations operate on `int` values; other types are unsupported.
 
 These limitations mean that `generate_ast.py` and the subsequent pipeline are best viewed as a proof of concept focusing on straight-line arithmetic with simple control flow.
 

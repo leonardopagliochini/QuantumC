@@ -54,8 +54,7 @@ parse and lower:
 - **Return statements** with or without a value.
 - **Binary operations with an immediate constant** on one side, enabling the
   use of specialized MLIR ops such as `iarith.addi_imm`.
-
-Unary operators are recognized in the AST but are not yet lowered to MLIR.
+- **Unary operators** including `+`, `-`, `++`, `--`, `!`, and `~`.
 No pointer arithmetic, floating point types, arrays or function calls are
 supported.
 

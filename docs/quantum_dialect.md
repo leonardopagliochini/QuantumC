@@ -20,7 +20,7 @@ Only a restricted portion of C is currently supported by the front-end:
 * Integer variables and assignments
 * Binary arithmetic operations (`+`, `-`, `*`, `/`)
 * Comparisons (`==`, `!=`, `<`, `<=`, `>`, `>=`)
-* Unary operators such as logical and arithmetic negation
+* Unary operators including arithmetic negation, logical NOT, bitwise NOT and pre/post increment/decrement
 * `if` statements and `for` loops (without break or continue)
 * Integer constants may appear directly as operands (immediates)
 * Return statements from a single function
