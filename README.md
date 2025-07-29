@@ -6,10 +6,12 @@ also includes tools to generate quantum circuits from the translated IR.
 
 ## Entry points
 
-- [`pipeline.py`](./pipeline.py) – main CLI that runs the conversion from a
-  JSON AST to classical MLIR and then to quantum MLIR.
-- [`circuit_pipeline.py`](./circuit_pipeline.py) – extends the pipeline to also
-  produce a `QuantumCircuit` and export it as QASM.
+- [`pipeline.py`](./pipeline.py) – compile a C source directly to QASM while
+  saving JSON and MLIR intermediates.
+- [`quantum_mlir_generator.py`](./quantum_mlir_generator.py) – wraps the
+  translation from classical MLIR to the custom quantum dialect.
+- [`qasm_generator.py`](./qasm_generator.py) – utilities to build a
+  `QuantumCircuit` and export it as QASM.
 - [`generate_ast.py`](./generate_ast.py) – helper that calls
   [`astJsonGen.py`](./astJsonGen.py) over the `c_code` folder to regenerate the
   JSON AST files.
@@ -84,17 +86,16 @@ also includes tools to generate quantum circuits from the translated IR.
 
 ## How it all fits together
 
-1. **Generate AST** – `generate_ast.py` uses Clang to convert the C programs in
-   `c_code/` into JSON files under `json_out/`.
-2. **Lower to MLIR** – `pipeline.py` (class `QuantumIR`) parses the JSON using
-   `c_ast.py`, lowers it to MLIR via `mlir_generator.py` and prints the result.
-3. **Translate to quantum MLIR** – the same pipeline instance calls
-   `quantum_translate.py` to replace arithmetic operations with quantum dialect
-   ones defined in `quantum_dialect.py` and `dialect_ops.py`.
-4. **Build circuits** – `circuit_pipeline.py` extends the previous step by
-   interpreting the quantum MLIR with Qiskit helpers from
-   `q_arithmetics.py` and `q_arithmetics_controlled.py` to produce a
-   `QuantumCircuit`.
+1. **Generate AST** – `pipeline.py` invokes Clang on the chosen C source and
+   stores the JSON AST under `json_out/`.
+2. **Lower to MLIR** – the AST is lowered by `mlir_generator.py` to classical
+   MLIR saved in `mlir_out/`.
+3. **Translate to quantum MLIR** – `quantum_mlir_generator.py` converts the
+   classical IR to the quantum dialect defined in `quantum_dialect.py` and
+   `dialect_ops.py`.
+4. **Build circuits** – `qasm_generator.py` interprets the quantum MLIR with
+   helpers from `q_arithmetics.py` and `q_arithmetics_controlled.py` and exports
+   a QASM circuit under `output/`.
 5. **Testing** – `test_all_c_files_to_fix.py` regenerates JSON and MLIR for all
    example sources, while `test_mlir_equivalence_to_fix.py` loads those modules
    and checks that classical and quantum executions produce identical results.
