@@ -8,7 +8,7 @@ from qiskit import QuantumCircuit
 from xdsl.dialects.func import ReturnOp
 from xdsl.dialects.builtin import ModuleOp
 
-from quantum_dialect import (
+from step4_mlir_to_quantum_mlir.quantum_dialect import (
     QuantumInitOp,
     QuantumCInitOp,
     QAddiOp,
@@ -32,8 +32,8 @@ from quantum_dialect import (
     QNotOp,
 )
 
-import q_arithmetics as qa
-import q_arithmetics_controlled as qac
+from . import q_arithmetics as qa
+from . import q_arithmetics_controlled as qac
 
 
 def generate_circuit(module: ModuleOp, num_bits: int = 16, verbose: bool = False) -> QuantumCircuit:

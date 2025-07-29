@@ -1,5 +1,5 @@
 from xdsl.dialects.builtin import ModuleOp
-from quantum_translate import QuantumTranslator
+from .quantum_translate import QuantumTranslator
 
 
 def generate_quantum_mlir(module: ModuleOp) -> ModuleOp:

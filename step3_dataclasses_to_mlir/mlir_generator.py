@@ -2,10 +2,23 @@ from xdsl.ir import Block, Region, SSAValue
 from xdsl.dialects.builtin import i32
 from xdsl.dialects.func import FuncOp, ReturnOp
 from xdsl.dialects.arith import ConstantOp, AddiOp, SubiOp, MuliOp, DivSIOp, CmpiOp, ExtUIOp
-from dialect_ops import AddiImmOp, SubiImmOp, MuliImmOp, DivSImmOp
+from .dialect_ops import AddiImmOp, SubiImmOp, MuliImmOp, DivSImmOp
 from xdsl.dialects.cf import ConditionalBranchOp as CondBranchOp
-from c_ast import Expression, IntegerLiteral, DeclRef, BinaryOperator, BinaryOperatorWithImmediate, UnaryOperator
-from c_ast import VarDecl, AssignStmt, ReturnStmt, FunctionDecl, CompoundStmt, IfStmt, ForStmt
+from step2_ast_to_dataclasses.c_ast import (
+    Expression,
+    IntegerLiteral,
+    DeclRef,
+    BinaryOperator,
+    BinaryOperatorWithImmediate,
+    UnaryOperator,
+    VarDecl,
+    AssignStmt,
+    ReturnStmt,
+    FunctionDecl,
+    CompoundStmt,
+    IfStmt,
+    ForStmt,
+)
 
 MAX_UNROLL = 10
 
