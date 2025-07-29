@@ -18,8 +18,8 @@ from xdsl.dialects.cf import Cf
 from xdsl.ir import Dialect
 
 
-from dialect_ops import AddiImmOp, SubiImmOp, MuliImmOp, DivSImmOp
-from quantum_dialect import (
+from step3_dataclasses_to_mlir.dialect_ops import AddiImmOp, SubiImmOp, MuliImmOp, DivSImmOp
+from step4_mlir_to_quantum_mlir.quantum_dialect import (
     QuantumInitOp,
     QAddiOp,
     QSubiOp,

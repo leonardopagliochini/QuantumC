@@ -6,7 +6,7 @@ JSON AST dump under ``json_out``.  It is meant to be a simple convenience entry
 point for refreshing the test inputs.
 """
 
-from astJsonGen import astJsonGen
+from .astJsonGen import astJsonGen
 
 # Invoke ``clang`` on all sources found under ``c_code`` and write their JSON
 # AST representation next to them under ``json_out``.  This module can be run as

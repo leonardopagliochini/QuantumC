@@ -7,9 +7,9 @@ from qiskit import QuantumCircuit
 
 from xdsl.dialects.func import ReturnOp
 
-from astJsonGen import astJsonGen
+from step1_c_to_ast.astJsonGen import astJsonGen
 
-from quantum_dialect import (
+from step4_mlir_to_quantum_mlir.quantum_dialect import (
     QuantumInitOp, QuantumCInitOp,
     QAddiOp, QSubiOp, QMuliOp, QDivSOp,
     QAddiImmOp, QSubiImmOp, QMuliImmOp, QDivSImmOp,
@@ -18,8 +18,8 @@ from quantum_dialect import (
     QCmpiOp, QAndOp, QNotOp,
 )
 
-import q_arithmetics as qa
-import q_arithmetics_controlled as qac
+from . import q_arithmetics as qa
+from . import q_arithmetics_controlled as qac
 from pipeline import QuantumIR
 
 

@@ -7,7 +7,7 @@ same result via :func:`compare_all`.
 """
 from __future__ import annotations
 
-from astJsonGen import astJsonGen
+from step1_c_to_ast.astJsonGen import astJsonGen
 from run_all_pipeline import generate_all
 from test_mlir_equivalence import compare_all
 

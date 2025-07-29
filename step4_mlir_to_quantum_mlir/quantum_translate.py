@@ -21,7 +21,7 @@ from xdsl.dialects.func import ReturnOp
 
 # Quantum dialect operations that mirror the arithmetic ops but operate on
 # quantum registers instead of plain integers.
-from quantum_dialect import (
+from .quantum_dialect import (
     QuantumInitOp,
     QAddiOp, QSubiOp, QMuliOp, QDivSOp,
     QAddiImmOp, QSubiImmOp, QMuliImmOp, QDivSImmOp,

@@ -9,10 +9,10 @@ import sys
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.printer import Printer
 
-from c_ast import parse_ast, TranslationUnit
-from mlir_generator import MLIRGenerator
-from quantum_mlir_generator import generate_quantum_mlir
-from qasm_generator import generate_circuit, export_qasm
+from step2_ast_to_dataclasses.c_ast import parse_ast, TranslationUnit
+from step3_dataclasses_to_mlir.mlir_generator import MLIRGenerator
+from step4_mlir_to_quantum_mlir.quantum_mlir_generator import generate_quantum_mlir
+from step5_quantum_mlir_to_qasm.qasm_generator import generate_circuit, export_qasm
 
 JSON_DIR = "json_out"
 MLIR_DIR = "mlir_out"
