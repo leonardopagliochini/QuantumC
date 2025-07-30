@@ -1,6 +1,7 @@
 """CLI driving the QuantumC compilation pipeline."""
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import subprocess
@@ -9,10 +10,11 @@ import sys
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.printer import Printer
 
-from step2_ast_to_dataclasses.c_ast import parse_ast, TranslationUnit
+from step2_ast_to_dataclasses.c_ast import parse_ast, TranslationUnit, pretty_print_translation_unit
 from step3_dataclasses_to_mlir.mlir_generator import MLIRGenerator
 from step4_mlir_to_quantum_mlir.quantum_mlir_generator import generate_quantum_mlir
 from step5_quantum_mlir_to_qasm.qasm_generator import generate_circuit, export_qasm
+from step5_quantum_mlir_to_qasm.q_arithmetics import simulate
 
 JSON_DIR = "json_out"
 MLIR_DIR = "mlir_out"
@@ -50,7 +52,7 @@ def save_module(module: ModuleOp, path: str) -> None:
         Printer(stream=f).print_op(module)
 
 
-def compile_c_file(c_file: str, num_bits: int = 16, verbose: bool = False) -> str:
+def compile_c_file(c_file: str, num_bits: int = 16, verbose: bool = False, pretty: bool = False) -> str:
     """Compile ``c_file`` through all pipeline stages and return the QASM path."""
     base = os.path.splitext(os.path.basename(c_file))[0]
 
@@ -58,6 +60,11 @@ def compile_c_file(c_file: str, num_bits: int = 16, verbose: bool = False) -> st
     with open(json_path) as f:
         ast_json = json.load(f)
     tu = parse_ast(ast_json)
+
+    if pretty:
+        print("=== Pretty Printed C Code ===")
+        print(pretty_print_translation_unit(tu))
+        print("================================")
 
     mlir_module = generate_mlir(tu)
     classical_path = os.path.join(MLIR_DIR, f"{base}_classical.mlir")
@@ -75,8 +82,27 @@ def compile_c_file(c_file: str, num_bits: int = 16, verbose: bool = False) -> st
 
 
 def main() -> None:
-    c_file = sys.argv[1] if len(sys.argv) > 1 else os.path.join("c_code", "try.c")
-    compile_c_file(c_file)
+    parser = argparse.ArgumentParser(description="Compile C code to QASM and optionally simulate.")
+    parser.add_argument("c_file", nargs="?", default=os.path.join("c_code", "try.c"), help="Path to the C file")
+    parser.add_argument("--run", action="store_true", help="Run the resulting QASM file with simulation")
+    parser.add_argument("--bits", type=int, default=16, help="Number of bits used for the quantum representation")
+    parser.add_argument("--verbose", action="store_true", help="Verbose output during circuit generation")
+    parser.add_argument("--pretty", action="store_true", help="Print the parsed C code from the AST")
+
+    args = parser.parse_args()
+
+    qasm_path = compile_c_file(
+        args.c_file,
+        num_bits=args.bits,
+        verbose=args.verbose,
+        pretty=args.pretty,
+    )
+
+    if args.run:
+        from qiskit import QuantumCircuit
+        print(f"Running simulation for {qasm_path} ...")
+        qc = QuantumCircuit.from_qasm_file(qasm_path)
+        simulate(qc)
 
 
 if __name__ == "__main__":

@@ -233,7 +233,10 @@ def parse_ast(ast_json: Dict) -> TranslationUnit:
             for stmt in inner.get("inner", []):
                 parsed = parse_statement(stmt)
                 if parsed:
-                    compound_stmt.stmts.append(parsed)
+                    if isinstance(parsed, list):
+                        compound_stmt.stmts.extend(parsed)
+                    else:
+                        compound_stmt.stmts.append(parsed)
 
 
         # If we successfully built a function body, add the function to the TU.
@@ -246,12 +249,14 @@ def parse_statement(stmt: Dict) -> Optional[Union[VarDecl, AssignStmt, ReturnStm
     kind = stmt.get("kind")
 
     if kind == "DeclStmt":
+        decls: list[VarDecl] = []
         for var_decl in stmt.get("inner", []):
             if var_decl.get("kind") == "VarDecl":
                 init_expr = None
                 if "inner" in var_decl and var_decl["inner"]:
                     init_expr = parse_expression(var_decl["inner"][0])
-                return VarDecl(var_decl["name"], init_expr)
+                decls.append(VarDecl(var_decl["name"], init_expr))
+        return decls  # restituisce lista di VarDecl
 
     elif kind == "BinaryOperator" and stmt["opcode"] == "=":
         lhs = stmt["inner"][0]
