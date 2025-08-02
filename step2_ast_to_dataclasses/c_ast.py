@@ -303,11 +303,12 @@ def parse_statement(stmt: Dict) -> Optional[Union[VarDecl, AssignStmt, ReturnStm
     
     elif kind == "ForStmt":
         inner = stmt.get("inner", [])
-
-        # Filtra solo gli elementi che hanno 'kind'
         real_inner = [x for x in inner if isinstance(x, dict) and 'kind' in x]
 
         init_stmt = parse_statement(real_inner[0]) if len(real_inner) > 0 else None
+        if isinstance(init_stmt, list):  # fix qui
+            init_stmt = init_stmt[0] if init_stmt else None
+
         condition_expr = parse_expression(real_inner[1]) if len(real_inner) > 1 else None
         increment_stmt = parse_statement(real_inner[2]) if len(real_inner) > 2 else None
 
