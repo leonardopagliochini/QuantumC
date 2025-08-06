@@ -193,3 +193,23 @@ def export_qasm(circuit: QuantumCircuit, path: str) -> str:
         f.write(qasm2.dumps(transpiled))
     print(f"QASM circuit written to {path}")
     return path
+
+import os
+from qiskit import QuantumCircuit, transpile
+from qiskit.qasm2 import dumps
+from qiskit.transpiler import PassManager
+
+def export_qasm_clifford_t(circuit: QuantumCircuit, path: str) -> str:
+    """Export the circuit to QASM with Clifford+T-only basis."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    # Transpile directly to Clifford+T
+    clifford_t_basis = ["h", "t", "tdg", "s", "sdg", "cx", "x", "measure", "rz", "p", "cp", "crz"]
+    transpiled = transpile(circuit, basis_gates=clifford_t_basis, optimization_level=3)
+
+    # Write to QASM2
+    from qiskit.qasm2 import dumps
+    with open(path, "w") as f:
+        f.write(dumps(transpiled))
+    print(f"✅ QASM written to: {path}")
+    return path
