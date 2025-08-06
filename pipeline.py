@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import sys
+import csv
 
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.printer import Printer
@@ -16,11 +17,15 @@ from step4_mlir_to_quantum_mlir.quantum_mlir_generator import generate_quantum_m
 from step5_quantum_mlir_to_qasm.qasm_generator import generate_circuit, export_qasm
 from step5_quantum_mlir_to_qasm.q_arithmetics import simulate
 
+from qiskit import QuantumCircuit, transpile
+from qiskit.transpiler import PassManager
+from qiskit.transpiler.passes import RemoveBarriers
+
 JSON_DIR = "json_out"
 MLIR_DIR = "mlir_out"
 QMLIR_DIR = "quantum_mlir_out"
 QASM_DIR = "output"
-
+BENCHMARK_CSV = "benchmark_results.csv"
 
 def generate_json_ast(c_path: str) -> str:
     """Run clang to dump the JSON AST for ``c_path``."""
@@ -37,7 +42,6 @@ def generate_json_ast(c_path: str) -> str:
 
 
 def generate_mlir(tu: TranslationUnit) -> ModuleOp:
-    """Lower the parsed AST ``tu`` to classical MLIR."""
     generator = MLIRGenerator()
     module = ModuleOp([])
     block = module.body.blocks[0]
@@ -53,7 +57,6 @@ def save_module(module: ModuleOp, path: str) -> None:
 
 
 def compile_c_file(c_file: str, num_bits: int = 16, verbose: bool = False, pretty: bool = False) -> str:
-    """Compile ``c_file`` through all pipeline stages and return the QASM path."""
     base = os.path.splitext(os.path.basename(c_file))[0]
 
     json_path = generate_json_ast(c_file)
@@ -81,6 +84,47 @@ def compile_c_file(c_file: str, num_bits: int = 16, verbose: bool = False, prett
     return qasm_path
 
 
+def run_benchmarks(folder: str, num_bits: int) -> None:
+    all_gate_types = set()
+    results = []
+
+    os.makedirs(QASM_DIR, exist_ok=True)
+
+    c_files = [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith(".c")]
+    for c_file in sorted(c_files):
+        try:
+            print(f"[+] Compiling {c_file}...")
+            qasm_path = compile_c_file(c_file, num_bits=num_bits)
+            qc = QuantumCircuit.from_qasm_file(qasm_path)
+            qc = transpile(qc, optimization_level=3)
+            qc = PassManager(RemoveBarriers()).run(qc)
+
+            gate_counts = qc.count_ops()
+            all_gate_types.update(gate_counts.keys())
+
+            results.append({
+                "filename": os.path.basename(c_file),
+                "num_qubits": qc.num_qubits,
+                "total_gates": qc.size(),
+                **gate_counts
+            })
+        except Exception as e:
+            print(f"[!] Error compiling {c_file}: {e}")
+
+    # Write CSV
+    all_gates = sorted(all_gate_types)
+    with open(BENCHMARK_CSV, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["filename", "num_qubits", "total_gates"] + all_gates)
+        writer.writeheader()
+        for row in results:
+            for g in all_gates:
+                if g not in row:
+                    row[g] = 0
+            writer.writerow(row)
+
+    print(f"[✓] Benchmark results saved to {BENCHMARK_CSV}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Compile C code to QASM and optionally simulate.")
     parser.add_argument("c_file", nargs="?", default=os.path.join("c_code", "try.c"), help="Path to the C file")
@@ -88,8 +132,13 @@ def main() -> None:
     parser.add_argument("--bits", type=int, default=16, help="Number of bits used for the quantum representation")
     parser.add_argument("--verbose", action="store_true", help="Verbose output during circuit generation")
     parser.add_argument("--pretty", action="store_true", help="Print the parsed C code from the AST")
+    parser.add_argument("--benchmarks", type=str, help="Run benchmark on folder of C files")
 
     args = parser.parse_args()
+
+    if args.benchmarks:
+        run_benchmarks(args.benchmarks, args.bits)
+        return
 
     qasm_path = compile_c_file(
         args.c_file,
