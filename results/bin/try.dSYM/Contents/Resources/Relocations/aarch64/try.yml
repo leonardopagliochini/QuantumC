@@ -1,0 +1,5 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/leonardoignaziopagliochini/Developer/QuantumC/results/bin/try'
+relocations:     []
+...
