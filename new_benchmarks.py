@@ -91,30 +91,112 @@ def cyclomatic_lizard(c_path: pathlib.Path) -> float:
 def compile_c_for_valgrind(c_path: pathlib.Path, out_bin: pathlib.Path, cc="gcc"):
     subprocess.run([cc, "-O0", "-g", str(c_path), "-o", str(out_bin)], check=True)
 
-def callgrind_ir(bin_path: pathlib.Path, run_cmd: str = None) -> int:
+def callgrind_ir(bin_path: pathlib.Path, run_cmd: str | None = None) -> int | None:
     """
-    Esegue il binario sotto Valgrind/Callgrind e ritorna Ir (instruction fetches).
-    run_cmd: se il programma richiede input, puoi passare ad es. "echo '42' |"
+    Esegue Valgrind/Callgrind e restituisce Ir.
+    - Copia il binario in /tmp (evita mount 'noexec')
+    - NON fallisce su exit code != 0 del programmino
+    - Prima prova con callgrind_annotate; se non trova Ir, effettua parsing diretto del file callgrind.out:
+        * legge "events:" -> individua indice di "Ir"
+        * legge "summary:" -> estrae il valore in quella posizione
     """
     import shlex
-    def shlexq(s: str) -> str:
-        return shlex.quote(s)
+
+    if shutil.which("valgrind") is None:
+        print("[!] Valgrind non trovato → Ir = NA")
+        return None
+
+    # callgrind_annotate è utile ma non indispensabile (il fallback legge il raw file)
+    has_annot = shutil.which("callgrind_annotate") is not None
+
+    # assicura eseguibile
+    try:
+        bin_path.chmod(bin_path.stat().st_mode | 0o111)
+    except Exception:
+        pass
 
     with tempfile.TemporaryDirectory() as td:
+        tmp_bin = pathlib.Path(td) / bin_path.name
+        shutil.copy2(bin_path, tmp_bin)
+        tmp_bin.chmod(tmp_bin.stat().st_mode | 0o111)
         cg_out = pathlib.Path(td) / "callgrind.out"
-        base_cmd = f"valgrind --tool=callgrind --callgrind-out-file={cg_out} {shlexq(str(bin_path))}"
-        if run_cmd:
-            cmd = ["bash", "-lc", f"{run_cmd} {base_cmd}"]
-        else:
-            cmd = ["bash", "-lc", base_cmd]
-        subprocess.run(cmd, check=True, capture_output=True, text=True)
 
-        ann = subprocess.run(["callgrind_annotate", str(cg_out)],
-                             check=True, capture_output=True, text=True).stdout
-        m = re.search(r"\bIr\s*:\s*([\d,\.]+)", ann)
-        if not m:
-            raise RuntimeError("Ir non trovato in callgrind_annotate")
-        return int(m.group(1).replace(",", "").replace(".", ""))
+        # Forza locale "C" per output standardizzato
+        env = os.environ.copy()
+        env["LANG"] = "C"
+        env["LC_ALL"] = "C"
+
+        vg_cmd = [
+            "valgrind",
+            "--tool=callgrind",
+            f"--callgrind-out-file={str(cg_out)}",
+            str(tmp_bin)
+        ]
+
+        # Nota: non richiediamo returncode==0 (il tuo try.c ritorna 27)
+        res = subprocess.run(
+            vg_cmd,
+            input=run_cmd if run_cmd is not None else None,
+            text=True,
+            capture_output=True,
+            env=env
+        )
+
+        if not cg_out.exists():
+            print(f"[!] Callgrind non ha prodotto output.\nSTDERR:\n{res.stderr}\nSTDOUT:\n{res.stdout}")
+            return None
+
+        # 1) Tentativo: callgrind_annotate
+        if has_annot:
+            ann = subprocess.run(
+                ["callgrind_annotate", str(cg_out)],
+                capture_output=True, text=True, env=env
+            )
+            if ann.returncode == 0:
+                m = re.search(r"\bIr\s*:\s*([\d,\.]+)", ann.stdout)
+                if m:
+                    return int(m.group(1).replace(",", "").replace(".", ""))
+
+        # 2) Fallback robusto: parsing diretto del file callgrind.out
+        try:
+            raw = cg_out.read_text()
+            # Trova eventi (ordine delle colonne)
+            # es: "events: Ir"   oppure "events: Ir Dr Dw"
+            ev_m = re.search(r"^events:\s*(.+)$", raw, re.MULTILINE)
+            if not ev_m:
+                print("[!] 'events:' non trovato in callgrind.out → Ir = NA")
+                return None
+            events = ev_m.group(1).strip().split()
+            # indice di Ir
+            try:
+                ir_idx = events.index("Ir")
+            except ValueError:
+                print("[!] 'Ir' non presente nella lista eventi → Ir = NA")
+                return None
+
+            # Trova summary:
+            # es: "summary: 1234567"    (se un solo evento)
+            #     "summary: 1234567 98765 4321" (se più eventi; Ir è alla posizione ir_idx)
+            sum_m = re.search(r"^summary:\s*([^\n]+)$", raw, re.MULTILINE)
+            if not sum_m:
+                print("[!] 'summary:' non trovato in callgrind.out → Ir = NA")
+                return None
+            nums = re.split(r"\s+", sum_m.group(1).strip())
+            # ripulisci separatori tipo , . _
+            def clean_num(s: str) -> str:
+                return re.sub(r"[,_\.]", "", s)
+            if ir_idx < len(nums):
+                val = clean_num(nums[ir_idx])
+                return int(val)
+            else:
+                # se per qualche motivo summary ha un solo numero e ir_idx=0, prova quello
+                if len(nums) == 1 and ir_idx == 0:
+                    return int(clean_num(nums[0]))
+                print("[!] Indice Ir fuori range nel summary → Ir = NA")
+                return None
+        except Exception as e:
+            print(f"[!] Fallback parsing callgrind.out fallito: {e} → Ir = NA")
+            return None
 
 # ---------- QASM parsing ----------
 

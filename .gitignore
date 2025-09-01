@@ -8,3 +8,7 @@ mlir_out
 json_out
 .DS_Store
 test_log
+corpus_c/*
+results/qasm/*
+quantum_mlir_out/*
+results/bin/*
