@@ -9,6 +9,8 @@ json_out
 .DS_Store
 test_log
 corpus_c/*
+corpus_c_ciclomatic/*
+corpus_c_instructions/*
 results/qasm/*
 quantum_mlir_out/*
 results/bin/*

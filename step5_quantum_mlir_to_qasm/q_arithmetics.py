@@ -10,7 +10,20 @@ try:
 except Exception:  # pragma: no cover - optional dependency
     AerSimulator = None
 
-NUMBER_OF_BITS = 4
+NUMBER_OF_BITS = 11
+
+def set_number_of_bits_controlled(n):
+    """
+    Set the number of bits for two's complement representation.
+    This function should be called before any other operations.
+    
+    Args:
+        n (int): The number of bits to use for two's complement representation.
+    """
+    global NUMBER_OF_BITS
+    if n <= 0:
+        raise ValueError("Number of bits must be a positive integer.")
+    NUMBER_OF_BITS = n
 
 def unique_reg_name(existing_names, base):
     """

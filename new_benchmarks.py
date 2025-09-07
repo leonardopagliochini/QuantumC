@@ -39,28 +39,31 @@ RESULTS_DIR.mkdir(exist_ok=True)
 QASM_DIR.mkdir(parents=True, exist_ok=True)
 BIN_DIR.mkdir(parents=True, exist_ok=True)
 
-# ---------- Logging helpers ----------
+# --- in alto ---
+import traceback
 
+# ---------- Logging helpers ----------
 def stamp() -> str:
     return time.strftime("%H:%M:%S")
 
 def log(stage: str, msg: str):
-    print(f"[{stamp()}] [{stage}] {msg}")
+    # Stampa SOLO gli errori (su stderr) e il riepilogo finale se vuoi
+    if stage == "ERROR":
+        print(f"[{stamp()}] [{stage}] {msg}", file=sys.stderr)
+    # opzionale: mostra solo il DONE finale
+    elif stage == "DONE":
+        print(f"[{stamp()}] [{stage}] {msg}")
+    # tutte le altre fasi tacciono
+    return
 
 def timed(stage: str):
     class _Ctx:
         def __enter__(self):
-            self.t0 = time.perf_counter()
-            log(stage, "start")
+            # niente log
             return self
         def __exit__(self, exc_type, exc, tb):
-            dt = time.perf_counter() - self.t0
-            if exc is None:
-                log(stage, f"done in {dt:.2f}s")
-            else:
-                log(stage, f"FAIL after {dt:.2f}s: {exc}")
-            # Do not suppress exceptions
-            return False
+            # niente log
+            return False  # non sopprime le eccezioni
     return _Ctx()
 
 # ---------- C metrics ----------
@@ -262,6 +265,7 @@ def process_file(c_path: pathlib.Path, bits: int, cc: str, arch: Optional[str], 
 
     with timed("QASM/PARSE"):
         qm = count_qasm_metrics(dest)
+
 
     return dict(cyclomatic=cc_val, ir_instructions=ir_val, **qm)
 

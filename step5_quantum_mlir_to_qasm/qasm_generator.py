@@ -39,6 +39,7 @@ from . import q_arithmetics_controlled as qac
 def generate_circuit(module: ModuleOp, num_bits: int = 16, verbose: bool = False) -> QuantumCircuit:
     """Convert ``module`` using the quantum dialect to a ``QuantumCircuit``."""
     qa.set_number_of_bits(num_bits)
+    qac.set_number_of_bits_controlled(num_bits)
     qc = QuantumCircuit()
     reg_map: Dict[object, object] = {}
 

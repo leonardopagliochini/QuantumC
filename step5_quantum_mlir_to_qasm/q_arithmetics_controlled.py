@@ -6,7 +6,7 @@ from .q_arithmetics import *
 from .q_arithmetics import _sub_in_place, _controlled_add_in_place
 import numpy as np
 
-NUMBER_OF_BITS = 4
+NUMBER_OF_BITS = 11
 
 def int_to_twos_complement(value):
     if value < 0:

@@ -40,24 +40,50 @@ def read_data(csv_path: pathlib.Path) -> pd.DataFrame:
     return df
 
 
-def quantile_bins(x: pd.Series, nbins: int):
-    """Ritorna (centri, labels) usando quantili; fallback a bins lineari se serve."""
-    vals = x.dropna().values
-    if len(vals) < 2:
-        if len(vals) == 0:
-            return np.array([]), pd.Series(pd.Categorical([]))
-        # un solo valore -> un unico bin
-        single_iv = pd.Interval(min(vals), max(vals), closed="both")
-        return np.array(vals), pd.Series(pd.Categorical([single_iv] * len(x)))
-    qs = np.linspace(0, 1, nbins + 1)
-    edges = np.unique(np.quantile(vals, qs))
-    if len(edges) <= 2:
-        # fallback lineare
-        uniq = max(2, int(pd.Series(vals).nunique()))
-        edges = np.linspace(x.min(), x.max(), min(nbins, uniq) + 1)
-    labels = pd.cut(x, bins=edges, include_lowest=True)
-    centers = np.array([(iv.left + iv.right) / 2.0 for iv in labels.cat.categories], dtype=float)
-    return centers, labels
+# --- aggiungi in testa se non ci sono già
+import numpy as np
+import pandas as pd
+
+def quantile_bins(x, nbins: int):
+    """
+    Restituisce (centers, categories) per binning per quantili.
+    Robusto a dati costanti o quasi-costanti:
+    - rimuove NaN
+    - de-duplica gli edge
+    - fallback a un singolo bin se serve
+    """
+    s = pd.Series(x).dropna()
+    if s.empty:
+        # nessun dato -> nessun bin
+        return np.array([]), pd.IntervalIndex([])
+
+    # calcola quantili desiderati
+    q = np.linspace(0.0, 1.0, nbins + 1)
+    edges = np.quantile(s.to_numpy(), q)
+
+    # rimuovi duplicati (caso costante)
+    edges = np.unique(edges)
+
+    # se rimane < 2 edge, crea un singolo bin attorno al valore
+    if edges.size < 2:
+        v = float(s.iloc[0])
+        # costruisci un piccolo intervallo attorno a v
+        eps = 0.5 if v == 0 else abs(v) * 0.01
+        edges = np.array([v - eps, v + eps])
+
+    # taglia con gestione duplicati
+    labels = pd.cut(s, bins=edges, include_lowest=True, duplicates="drop")
+    cats = labels.cat.categories
+
+    # se per qualunque motivo non ci sono categorie, crea un bin unico
+    if len(cats) == 0:
+        v = float(s.iloc[0])
+        eps = 0.5 if v == 0 else abs(v) * 0.01
+        cats = pd.IntervalIndex.from_tuples([(v - eps, v + eps)])
+
+    centers = np.array([iv.mid for iv in cats], dtype=float)
+    return centers, cats
+
 
 
 def line_plot_x_stat_y_quantum(df: pd.DataFrame, x_col: str, quantum_col: str,
@@ -71,7 +97,9 @@ def line_plot_x_stat_y_quantum(df: pd.DataFrame, x_col: str, quantum_col: str,
         return
 
     # observed=False => include anche i bin non osservati (NaN)
-    grp = df.groupby(bins, observed=False)[quantum_col].mean()
+    labels = pd.cut(df[x_col], bins=bins, include_lowest=True, duplicates="drop")
+    grp = df.groupby(labels, observed=False)[quantum_col].mean()
+
 
     # ascisse = midpoint degli intervalli presenti nelle CATEGORIE dell'indice
     cats = grp.index.categories
