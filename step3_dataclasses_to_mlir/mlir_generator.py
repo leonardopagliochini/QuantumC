@@ -20,10 +20,12 @@ from step2_ast_to_dataclasses.c_ast import (
     ForStmt,
 )
 
-MAX_UNROLL = 10
+DEFAULT_MAX_UNROLL = 30  # default di sicurezza / retrocompatibilità
 
 class MLIRGenerator:
-    def __init__(self) -> None:
+    def __init__(self, max_unroll: int = DEFAULT_MAX_UNROLL) -> None:
+        # clamp minimo a 1 per evitare loop vuoti
+        self.max_unroll: int = max(1, int(max_unroll))
         self.symbol_table: dict[str, SSAValue | None] = {}
         self.current_block: Block | None = None
         self.function_region: Region | None = None
@@ -210,7 +212,7 @@ class MLIRGenerator:
         self.current_block = else_block
         self._lower_block(tail)
 
-        for _ in range(MAX_UNROLL):
+        for _ in range(self.max_unroll):
             self.current_block = then_block
             self._lower_block(stmt.body.stmts)
 

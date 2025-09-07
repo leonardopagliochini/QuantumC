@@ -3,11 +3,11 @@
 tools/plot_metrics.py
 
 Legge results/metrics.csv e genera:
-1) CC vs Quantum (x = metrica quantistica, y = CC medio) — media su Ir
+1) CC vs Quantum (x = cyclomatic, y = metrica quantistica media)
    -> plots/cc_vs_quantum/<metric>.pdf
-2) Ir vs Quantum (x = metrica quantistica, y = Ir medio) — media su CC
+2) Ir vs Quantum (x = ir_instructions, y = metrica quantistica media)
    -> plots/ir_vs_quantum/<metric>.pdf
-3) Contour (x = CC, y = Ir, colore = metrica quantistica media)
+3) Contour (x = cyclomatic, y = ir_instructions, colore = metrica quantistica media)
    -> plots/contours/<metric>.pdf
 """
 
@@ -44,38 +44,59 @@ def quantile_bins(x: pd.Series, nbins: int):
     """Ritorna (centri, labels) usando quantili; fallback a bins lineari se serve."""
     vals = x.dropna().values
     if len(vals) < 2:
-        # niente da bin-are
-        return np.array(vals), pd.Series(pd.Categorical([pd.Interval(min(vals), max(vals), closed="both")] * len(x)))
+        if len(vals) == 0:
+            return np.array([]), pd.Series(pd.Categorical([]))
+        # un solo valore -> un unico bin
+        single_iv = pd.Interval(min(vals), max(vals), closed="both")
+        return np.array(vals), pd.Series(pd.Categorical([single_iv] * len(x)))
     qs = np.linspace(0, 1, nbins + 1)
     edges = np.unique(np.quantile(vals, qs))
     if len(edges) <= 2:
-        edges = np.linspace(x.min(), x.max(), min(nbins, max(2, x.nunique())) + 1)
+        # fallback lineare
+        uniq = max(2, int(pd.Series(vals).nunique()))
+        edges = np.linspace(x.min(), x.max(), min(nbins, uniq) + 1)
     labels = pd.cut(x, bins=edges, include_lowest=True)
     centers = np.array([(iv.left + iv.right) / 2.0 for iv in labels.cat.categories], dtype=float)
     return centers, labels
 
 
-def line_plot_x_quantum_y_stat(df: pd.DataFrame, quantum_col: str, y_col: str,
+def line_plot_x_stat_y_quantum(df: pd.DataFrame, x_col: str, quantum_col: str,
                                out_path: pathlib.Path, nbins: int,
-                               y_label: str, title: str):
-    centers, bins = quantile_bins(df[quantum_col], nbins)
-    grp = df.groupby(bins, observed=True)[y_col].mean()
-    # drop dei bin vuoti:
-    mask = ~grp.isna()
-    x = centers[:len(grp)][mask]
-    y = grp.values[mask]
+                               x_label: str, title: str):
+    """
+    Binna lungo x_col e plottiamo la media di quantum_col per bin.
+    """
+    centers, bins = quantile_bins(df[x_col], nbins)
+    if len(centers) == 0:
+        return
+
+    # observed=False => include anche i bin non osservati (NaN)
+    grp = df.groupby(bins, observed=False)[quantum_col].mean()
+
+    # ascisse = midpoint degli intervalli presenti nelle CATEGORIE dell'indice
+    cats = grp.index.categories
+    x_all = np.array([(iv.left + iv.right) / 2.0 for iv in cats], dtype=float)
+
+    # y con la stessa cardinalità (tutti i bin, inclusi NaN)
+    y_all = grp.reindex(cats).values  # assicura allineamento 1:1 con cats
+
+    # filtra via i bin vuoti
+    valid = ~np.isnan(y_all)
+    x = x_all[valid]
+    y = y_all[valid]
 
     if len(x) == 0:
         return
 
     fig = plt.figure()
     plt.plot(x, y, marker="o")
-    plt.xlabel(quantum_col)
-    plt.ylabel(y_label)
+    plt.xlabel(x_label)
+    plt.ylabel(f"{quantum_col} (media)")
     plt.title(title)
     plt.tight_layout()
     fig.savefig(out_path, format="pdf")
     plt.close(fig)
+
 
 
 def contour_plot(df: pd.DataFrame, quantum_col: str, out_path: pathlib.Path,
@@ -144,35 +165,35 @@ def main():
     if missing:
         raise SystemExit(f"Mancano colonne nel CSV: {missing}")
 
-    # 1) CC vs Quantum (media marginale su Ir)
+    # 1) CC vs Quantum: x=cyclomatic, y=QM (media)
     cc_dir = out_dir / "cc_vs_quantum"
     for qm in QUANTUM_METRICS:
-        line_plot_x_quantum_y_stat(
+        line_plot_x_stat_y_quantum(
             df=df,
+            x_col="cyclomatic",
             quantum_col=qm,
-            y_col="cyclomatic",
             out_path=cc_dir / f"{qm}.pdf",
             nbins=args.bins1d,
-            y_label="cyclomatic (media)",
-            title=f"cyclomatic vs {qm}  (media su Ir)"
+            x_label="cyclomatic",
+            title=f"{qm} vs cyclomatic"
         )
 
-    # 2) Ir vs Quantum (media su CC)
+    # 2) Ir vs Quantum: x=ir_instructions, y=QM (media)
     ir_dir = out_dir / "ir_vs_quantum"
     df_ir = df.dropna(subset=["ir_instructions"])
     if not df_ir.empty:
         for qm in QUANTUM_METRICS:
-            line_plot_x_quantum_y_stat(
+            line_plot_x_stat_y_quantum(
                 df=df_ir,
+                x_col="ir_instructions",
                 quantum_col=qm,
-                y_col="ir_instructions",
                 out_path=ir_dir / f"{qm}.pdf",
                 nbins=args.bins1d,
-                y_label="ir_instructions (media)",
-                title=f"ir_instructions vs {qm}  (media su cyclomatic)"
+                x_label="ir_instructions",
+                title=f"{qm} vs ir_instructions"
             )
 
-    # 3) Contours (CC, Ir) -> colore = qm medio
+    # 3) Contours (CC, Ir) -> colore = qm medio (invariato)
     cont_dir = out_dir / "contours"
     for qm in QUANTUM_METRICS:
         contour_plot(df, qm, cont_dir / f"{qm}.pdf",
@@ -181,9 +202,9 @@ def main():
     # README
     (out_dir / "README.txt").write_text(
         "Contenuto:\n"
-        " - cc_vs_quantum/<metric>.pdf : x=metrica Q, y=cyclomatic medio (media su Ir)\n"
-        " - ir_vs_quantum/<metric>.pdf : x=metrica Q, y=Ir medio (media su CC)\n"
-        " - contours/<metric>.pdf      : x=cyclomatic, y=Ir, colore=metrica Q media\n"
+        " - cc_vs_quantum/<metric>.pdf : x=cyclomatic, y=metrica Q media\n"
+        " - ir_vs_quantum/<metric>.pdf : x=ir_instructions, y=metrica Q media\n"
+        " - contours/<metric>.pdf      : x=cyclomatic, y=ir_instructions, colore=metrica Q media\n"
         f"\nGenerati da: {csv_path}\n"
     )
     print(f"[✓] Output salvato in: {out_dir.resolve()}")

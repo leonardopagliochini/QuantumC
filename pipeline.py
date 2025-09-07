@@ -42,8 +42,8 @@ def generate_json_ast(c_path: str) -> str:
     return json_path
 
 
-def generate_mlir(tu: TranslationUnit) -> ModuleOp:
-    generator = MLIRGenerator()
+def generate_mlir(tu: TranslationUnit, max_iter: int) -> ModuleOp:
+    generator = MLIRGenerator(max_unroll=max_iter)
     module = ModuleOp([])
     block = module.body.blocks[0]
     for func in tu.decls:
@@ -58,7 +58,12 @@ def save_module(module: ModuleOp, path: str) -> None:
 
 
 def compile_c_file(
-    c_file: str, num_bits: int = 16, verbose: bool = False, pretty: bool = False, run: bool = False
+    c_file: str,
+    num_bits: int = 16,
+    verbose: bool = False,
+    pretty: bool = False,
+    run: bool = False,
+    max_iter: int = 30,
 ) -> str:
     base = os.path.splitext(os.path.basename(c_file))[0]
 
@@ -72,7 +77,7 @@ def compile_c_file(
         print(pretty_print_translation_unit(tu))
         print("================================")
 
-    mlir_module = generate_mlir(tu)
+    mlir_module = generate_mlir(tu, max_iter=max_iter)
     classical_path = os.path.join(MLIR_DIR, f"{base}_classical.mlir")
     save_module(mlir_module, classical_path)
 
@@ -92,7 +97,7 @@ def compile_c_file(
     return qasm_path
 
 
-def run_benchmarks(folder: str, num_bits: int) -> None:
+def run_benchmarks(folder: str, num_bits: int, max_iter: int) -> None:
     all_gate_types = set()
     results = []
 
@@ -102,7 +107,7 @@ def run_benchmarks(folder: str, num_bits: int) -> None:
     for c_file in sorted(c_files):
         try:
             print(f"[+] Compiling {c_file}...")
-            qasm_path = compile_c_file(c_file, num_bits=num_bits, run=False)
+            qasm_path = compile_c_file(c_file, num_bits=num_bits, run=False, max_iter=max_iter)
             qc = QuantumCircuit.from_qasm_file(qasm_path)
             qc = transpile(qc, optimization_level=3)
             qc = PassManager(RemoveBarriers()).run(qc)
@@ -141,11 +146,18 @@ def main() -> None:
     parser.add_argument("--pretty", action="store_true", help="Print the parsed C code from the AST")
     parser.add_argument("--benchmarks", type=str, help="Run benchmark on folder of C files")
     parser.add_argument("--time", action="store_true", help="Print total compilation + simulation time")
+    parser.add_argument(
+        "--max-iter", "--max-unroll",
+        dest="max_iter",
+        type=int,
+        default=30,
+        help="Maximum unrolling iterations for lowering 'for' loops (default: 30). Alias: --max-unroll",
+    )
 
     args = parser.parse_args()
 
     if args.benchmarks:
-        run_benchmarks(args.benchmarks, args.bits)
+        run_benchmarks(args.benchmarks, args.bits, args.max_iter)
         return
 
     start = time.time() if args.time else None
@@ -156,6 +168,7 @@ def main() -> None:
         verbose=args.verbose,
         pretty=args.pretty,
         run=args.run,
+        max_iter=args.max_iter,
     )
 
     if args.run:

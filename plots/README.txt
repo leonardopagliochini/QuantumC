@@ -1,6 +1,6 @@
 Contenuto:
- - cc_vs_quantum/<metric>.pdf : x=metrica Q, y=cyclomatic medio (media su Ir)
- - ir_vs_quantum/<metric>.pdf : x=metrica Q, y=Ir medio (media su CC)
- - contours/<metric>.pdf      : x=cyclomatic, y=Ir, colore=metrica Q media
+ - cc_vs_quantum/<metric>.pdf : x=cyclomatic, y=metrica Q media
+ - ir_vs_quantum/<metric>.pdf : x=ir_instructions, y=metrica Q media
+ - contours/<metric>.pdf      : x=cyclomatic, y=ir_instructions, colore=metrica Q media
 
 Generati da: results/metrics.csv
