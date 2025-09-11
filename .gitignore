@@ -11,6 +11,8 @@ test_log
 corpus_c/*
 corpus_c_ciclomatic/*
 corpus_c_instructions/*
+corpus_c_instructions_weighted/*
+tools/results/*
 results/qasm/*
 quantum_mlir_out/*
 results/bin/*

@@ -40,7 +40,7 @@ def read_data(csv_path: pathlib.Path) -> pd.DataFrame:
     return df
 
 
-# --- aggiungi in testa se non ci sono già
+# --- util quantile bins
 import numpy as np
 import pandas as pd
 
@@ -54,28 +54,20 @@ def quantile_bins(x, nbins: int):
     """
     s = pd.Series(x).dropna()
     if s.empty:
-        # nessun dato -> nessun bin
         return np.array([]), pd.IntervalIndex([])
 
-    # calcola quantili desiderati
     q = np.linspace(0.0, 1.0, nbins + 1)
     edges = np.quantile(s.to_numpy(), q)
-
-    # rimuovi duplicati (caso costante)
     edges = np.unique(edges)
 
-    # se rimane < 2 edge, crea un singolo bin attorno al valore
     if edges.size < 2:
         v = float(s.iloc[0])
-        # costruisci un piccolo intervallo attorno a v
         eps = 0.5 if v == 0 else abs(v) * 0.01
         edges = np.array([v - eps, v + eps])
 
-    # taglia con gestione duplicati
     labels = pd.cut(s, bins=edges, include_lowest=True, duplicates="drop")
     cats = labels.cat.categories
 
-    # se per qualunque motivo non ci sono categorie, crea un bin unico
     if len(cats) == 0:
         v = float(s.iloc[0])
         eps = 0.5 if v == 0 else abs(v) * 0.01
@@ -96,19 +88,13 @@ def line_plot_x_stat_y_quantum(df: pd.DataFrame, x_col: str, quantum_col: str,
     if len(centers) == 0:
         return
 
-    # observed=False => include anche i bin non osservati (NaN)
     labels = pd.cut(df[x_col], bins=bins, include_lowest=True, duplicates="drop")
     grp = df.groupby(labels, observed=False)[quantum_col].mean()
 
-
-    # ascisse = midpoint degli intervalli presenti nelle CATEGORIE dell'indice
     cats = grp.index.categories
     x_all = np.array([(iv.left + iv.right) / 2.0 for iv in cats], dtype=float)
+    y_all = grp.reindex(cats).values
 
-    # y con la stessa cardinalità (tutti i bin, inclusi NaN)
-    y_all = grp.reindex(cats).values  # assicura allineamento 1:1 con cats
-
-    # filtra via i bin vuoti
     valid = ~np.isnan(y_all)
     x = x_all[valid]
     y = y_all[valid]
@@ -129,22 +115,34 @@ def line_plot_x_stat_y_quantum(df: pd.DataFrame, x_col: str, quantum_col: str,
 
 def contour_plot(df: pd.DataFrame, quantum_col: str, out_path: pathlib.Path,
                  bins_cc: int, bins_ir: int):
+    """
+    Heatmap media per bin:
+    - Asse X (cyclomatic): bin per OGNI intero da min a max (1,2,3,...)
+    - Asse Y (ir_instructions): bin lineari (bins_ir)
+    """
     d = df.dropna(subset=["cyclomatic", "ir_instructions"])
     if d.empty:
         return
 
-    # Edges fissi (lineari) per costruire una griglia MxN completa
-    cc_min, cc_max = d["cyclomatic"].min(), d["cyclomatic"].max()
-    ir_min, ir_max = d["ir_instructions"].min(), d["ir_instructions"].max()
-    if not np.isfinite([cc_min, cc_max, ir_min, ir_max]).all() or cc_min == cc_max or ir_min == ir_max:
-        return
-
-    cc_edges = np.linspace(cc_min, cc_max, bins_cc + 1)
-    ir_edges = np.linspace(ir_min, ir_max, bins_ir + 1)
-
+    # --- Binning X: tutti gli interi tra min e max
+    cc_min_val = int(np.floor(d["cyclomatic"].min()))
+    cc_max_val = int(np.ceil(d["cyclomatic"].max()))
+    if cc_min_val == cc_max_val:
+        # se c'è un solo valore, allarghiamo di 1 per avere una cella visibile
+        cc_min_val -= 1
+        cc_max_val += 1
+    # edges centrati sugli interi: [n-0.5, n+0.5, ...]
+    cc_edges = np.arange(cc_min_val - 0.5, cc_max_val + 1.5, 1.0)
     cc_cats = pd.IntervalIndex.from_breaks(cc_edges, closed="left")
+
+    # --- Binning Y: lineare come prima
+    ir_min, ir_max = d["ir_instructions"].min(), d["ir_instructions"].max()
+    if not np.isfinite([ir_min, ir_max]).all() or ir_min == ir_max:
+        return
+    ir_edges = np.linspace(ir_min, ir_max, bins_ir + 1)
     ir_cats = pd.IntervalIndex.from_breaks(ir_edges, closed="left")
 
+    # Taglio nei bin
     cc_bin = pd.cut(d["cyclomatic"], bins=cc_edges, include_lowest=True, right=False)
     ir_bin = pd.cut(d["ir_instructions"], bins=ir_edges, include_lowest=True, right=False)
 
@@ -156,11 +154,11 @@ def contour_plot(df: pd.DataFrame, quantum_col: str, out_path: pathlib.Path,
                            aggfunc="mean", dropna=False)
     pivot = pivot.reindex(index=cc_cats, columns=ir_cats)
 
-    Z = pivot.values  # shape (bins_cc, bins_ir)
+    Z = pivot.values  # shape (n_cc_bins, bins_ir)
     if Z.size == 0:
         return
 
-    # Griglia edges 2D per pcolormesh (C: MxN, edges: (M+1)x(N+1))
+    # Griglia edges 2D per pcolormesh (edges: (M+1)x(N+1))
     X, Y = np.meshgrid(cc_edges, ir_edges, indexing="ij")
 
     fig = plt.figure()
@@ -170,6 +168,12 @@ def contour_plot(df: pd.DataFrame, quantum_col: str, out_path: pathlib.Path,
     plt.xlabel("cyclomatic")
     plt.ylabel("ir_instructions")
     plt.title(f"{quantum_col} (media per bin)")
+
+    # --- Ticks X: tutti gli interi (1,2,3,...) dal min al max
+    # centro di ciascun bin: n esatto
+    xticks = np.arange(cc_min_val, cc_max_val + 1, 1, dtype=int)
+    plt.xticks(xticks, [str(n) for n in xticks], rotation=0)
+
     plt.tight_layout()
     fig.savefig(out_path, format="pdf")
     plt.close(fig)
@@ -221,7 +225,7 @@ def main():
                 title=f"{qm} vs ir_instructions"
             )
 
-    # 3) Contours (CC, Ir) -> colore = qm medio (invariato)
+    # 3) Contours (CC, Ir) -> colore = qm medio
     cont_dir = out_dir / "contours"
     for qm in QUANTUM_METRICS:
         contour_plot(df, qm, cont_dir / f"{qm}.pdf",

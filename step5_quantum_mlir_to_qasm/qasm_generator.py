@@ -192,7 +192,7 @@ def export_qasm(circuit: QuantumCircuit, path: str) -> str:
 
     with open(path, "w") as f:
         f.write(qasm2.dumps(transpiled))
-    print(f"QASM circuit written to {path}")
+    # print(f"QASM circuit written to {path}")
     return path
 
 import os
