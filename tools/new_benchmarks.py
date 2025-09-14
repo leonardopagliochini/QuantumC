@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-bench_all.py — End-to-end:
+new_benchmark.py — End-to-end:
 - Cyclomatic Complexity (Lizard)
 - Instruction Count Ir (Valgrind/Callgrind) on target arch
 - Circuit metrics from QASM (num_qubits, total_gates, cx, measure, u1,u2,u3, depth)
@@ -11,7 +11,7 @@ New metrics:
 - peak_rss_bytes     (peak RSS of this Python proc + children; requires psutil)
 
 Usage:
-  python tools/bench_all.py --corpus corpus_c --bits 16 --arch x86-64
+  python tools/new_benchmark.py --corpus corpus_c --bits 16 --arch x86-64
 """
 
 import argparse

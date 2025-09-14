@@ -117,16 +117,47 @@ def main() -> None:
         by = bin_index(y, y_edges)
         M[by][bx] = 1  # presence
 
-    # Make a figure
+    # Make a figure (scatter circles at bin centers)
     fig, ax = plt.subplots(figsize=tuple(args.figsize))
-    cmap = ListedColormap(["white", "black"])  # 0->white, 1->black
-    im = ax.imshow(M, origin="lower", aspect="auto", cmap=cmap, vmin=0, vmax=1)
 
-    # Tick labels based on bin LEFT edges so widths map to expected integers
     W = len(x_edges) - 1
     H = len(y_edges) - 1
 
-    # Limit tick count for readability (by index)
+    def centers(edges: List[float]) -> List[float]:
+        return [(edges[i] + edges[i+1]) / 2.0 for i in range(len(edges) - 1)]
+
+    x_cent = centers(x_edges)
+    y_cent = centers(y_edges)
+
+    xs_present, ys_present = [], []
+    xs_absent, ys_absent = [], []
+    active = 0
+    for by in range(H):
+        for bx in range(W):
+            if M[by][bx] > 0:
+                xs_present.append(x_cent[bx])
+                ys_present.append(y_cent[by])
+                active += 1
+            else:
+                xs_absent.append(x_cent[bx])
+                ys_absent.append(y_cent[by])
+
+    # Draw grid lines at bin edges
+    for xe in x_edges:
+        ax.vlines(xe, y_edges[0], y_edges[-1], colors="#dddddd", linewidth=0.6, zorder=0)
+    for ye in y_edges:
+        ax.hlines(ye, x_edges[0], x_edges[-1], colors="#dddddd", linewidth=0.6, zorder=0)
+
+    # Scatter circles: filled black for presence, hollow gray for absence
+    if xs_absent:
+        ax.scatter(xs_absent, ys_absent, s=70, facecolors='none', edgecolors='lightgray', marker='o', linewidths=1.0, zorder=2)
+    if xs_present:
+        ax.scatter(xs_present, ys_present, s=70, c='black', marker='o', zorder=3)
+
+    ax.set_xlim(x_edges[0], x_edges[-1])
+    ax.set_ylim(y_edges[0], y_edges[-1])
+
+    # Tick labels based on bin LEFT edges so widths map to expected integers
     def pick_idx(n: int, max_ticks: int = 20) -> List[int]:
         if n <= max_ticks:
             return list(range(n))
@@ -136,23 +167,22 @@ def main() -> None:
     xi = pick_idx(W, max_ticks=15)
     yi = pick_idx(H, max_ticks=15)
 
-    # Build labels from left edges
     def fmt(v: float) -> str:
         iv = int(round(v))
         return str(iv) if abs(v - iv) < 1e-6 else f"{v:.2g}"
 
-    x_labels = [fmt(x_edges[i]) for i in xi]
-    y_labels = [fmt(y_edges[j]) for j in yi]
-
-    ax.set_xticks(xi)
-    ax.set_xticklabels(x_labels, rotation=45, ha="right")
-    ax.set_yticks(yi)
-    ax.set_yticklabels(y_labels)
+    ax.set_xticks([x_edges[i] for i in xi])
+    ax.set_xticklabels([fmt(x_edges[i]) for i in xi], rotation=45, ha="right")
+    ax.set_yticks([y_edges[j] for j in yi])
+    ax.set_yticklabels([fmt(y_edges[j]) for j in yi])
 
     ax.set_xlabel(args.x)
     ax.set_ylabel(args.y)
     if args.title:
-        ax.set_title(args.title)
+        total = W * H
+        ax.set_title(f"{args.title} — active {active}/{total}")
+    else:
+        ax.set_title(f"Active bins: {active}/{W*H}")
     fig.tight_layout()
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     fig.savefig(args.out, dpi=200)

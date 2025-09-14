@@ -165,6 +165,15 @@ python tools/remove_ir_baseline.py \
 
 ### D. Fixed-grid presence plot — `tools/plot_bw_bins.py`
 
+Fast use example (5-instructions bins)
+```
+python tools/plot_bw_bins.py \
+  --csv tools/results/corpus_grid10_cc_ir.csv \
+  --x cyclomatic --y ir_instructions \
+  --x-bin-w 1 --y-bin-w 5 \
+  --out tools/results/corpus_grid10_bins10_bw.png
+```
+
 Recommended call for Ir-binned presence (after activating your env):
 
 ```

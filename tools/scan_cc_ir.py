@@ -20,6 +20,7 @@ Opzioni utili:
 import argparse
 import csv
 import os
+import concurrent.futures
 import pathlib
 import re
 import shutil
@@ -296,6 +297,33 @@ def main():
     corpus = pathlib.Path(args.corpus)
     c_files = sorted(p for p in corpus.glob("*.c"))
 
+    # Determine output CSV path early (for skip logic)
+    if args.out is None:
+        corpus_name = corpus.name.rstrip(os.sep)
+        out_csv = RESULTS_DIR / f"{corpus_name}_cc_ir.csv"
+    else:
+        out_csv = pathlib.Path(args.out)
+
+    # Load existing entries if present
+    existing_rows: List[Dict[str, Optional[float]]] = []
+    existing_set: set[str] = set()
+    if out_csv.exists():
+        try:
+            with out_csv.open("r", newline="", encoding="utf-8") as f:
+                rd = csv.DictReader(f)
+                for row in rd:
+                    fn = row.get("file")
+                    if fn:
+                        existing_set.add(fn)
+                        existing_rows.append({
+                            "file": fn,
+                            "cyclomatic": row.get("cyclomatic"),
+                            "ir_instructions": row.get("ir_instructions"),
+                        })
+        except Exception:
+            existing_rows = []
+            existing_set = set()
+
     progress = _make_progress(len(c_files), mode=args.progress, desc="Files")
 
     def stage_writer(msg: str):
@@ -306,38 +334,79 @@ def main():
         else:
             progress.write(msg)
 
-    rows = []
+    rows_new: List[Dict[str, Optional[float]]] = []
+
+    # Build work lists: mark skips up-front, then parallelize the remaining
+    to_process: List[pathlib.Path] = []
     try:
         for c_path in c_files:
-            try:
-                r = process_file(c_path, cc_compiler=args.cc, arch=args.arch,
-                                 run_cmd=args.input_cmd, stage_writer=stage_writer if args.show_stages else None,
-                                 roi=args.roi, roi_func=args.roi_func)
-                rows.append(dict(file=c_path.name, **r))
-            except KeyboardInterrupt:
-                if progress: progress.write("Interrotto dall'utente")
-                break
-            except Exception:
-                if progress: progress.write(f"{c_path.name}: eccezione non gestita")
-                print(traceback.format_exc(), file=sys.stderr)
-            finally:
+            if c_path.name in existing_set:
+                if progress is not None:
+                    progress.write(f"{c_path.name}: SKIP — already in {out_csv.name}")
+                else:
+                    print(f"{c_path.name}: SKIP — already in {out_csv.name}")
                 if progress: progress.update(1)
+            else:
+                to_process.append(c_path)
+
+        # Parallel processing for remaining files
+        if to_process:
+            max_workers = max(1, (os.cpu_count() or 2) - 1)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
+                future_map = {
+                    ex.submit(
+                        process_file,
+                        c_path,
+                        cc_compiler=args.cc,
+                        arch=args.arch,
+                        run_cmd=args.input_cmd,
+                        stage_writer=None,  # avoid interleaved stage logs in parallel
+                        roi=args.roi,
+                        roi_func=args.roi_func,
+                    ): c_path for c_path in to_process
+                }
+                for fut in concurrent.futures.as_completed(future_map):
+                    c_path = future_map[fut]
+                    try:
+                        r = fut.result()
+                        rows_new.append(dict(file=c_path.name, **r))
+                        if progress is not None and args.show_stages:
+                            progress.write(f"{c_path.name}: DONE (CC={r.get('cyclomatic')}, Ir={r.get('ir_instructions')})")
+                    except KeyboardInterrupt:
+                        if progress: progress.write("Interrotto dall'utente")
+                        raise
+                    except Exception:
+                        if progress: progress.write(f"{c_path.name}: eccezione non gestita")
+                        print(traceback.format_exc(), file=sys.stderr)
+                    finally:
+                        if progress: progress.update(1)
     finally:
         if progress: progress.close()
 
-    # Determine default output name from corpus if not provided
-    if args.out is None:
-        corpus_name = corpus.name.rstrip(os.sep)
-        out_csv = RESULTS_DIR / f"{corpus_name}_cc_ir.csv"
-    else:
-        out_csv = pathlib.Path(args.out)
+    # Combine existing + new rows
+    all_rows = list(existing_rows) + rows_new
+    # Reorder rows: by cyclomatic (numeric), then by ir_instructions (numeric), then by file name
+    def _to_float(v):
+        try:
+            return float(v)
+        except Exception:
+            return float("inf")
+    def _to_int(v):
+        try:
+            return int(v)
+        except Exception:
+            try:
+                return int(float(v))
+            except Exception:
+                return 10**18
+    all_rows.sort(key=lambda r: (_to_float(r.get('cyclomatic')), _to_int(r.get('ir_instructions')), r.get('file') or ""))
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     with out_csv.open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=["file", "cyclomatic", "ir_instructions"])
         w.writeheader()
-        w.writerows(rows)
+        w.writerows(all_rows)
 
-    print(f"[DONE] Written: {out_csv} — {len(rows)} files")
+    print(f"[DONE] Written: {out_csv} — {len(all_rows)} files")
 
 if __name__ == "__main__":
     main()
