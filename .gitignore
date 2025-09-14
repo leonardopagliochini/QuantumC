@@ -16,3 +16,4 @@ tools/results/*
 results/qasm/*
 quantum_mlir_out/*
 results/bin/*
+*corpus*

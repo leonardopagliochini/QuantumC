@@ -140,24 +140,35 @@ def make_prework(steps: int, ops_per_iter: int) -> str:
             seq.append(core[i % len(core)])
     return "".join(f"  {line}\n" for line in seq)
 
-def make_int_ops(count: int, use_globals: bool = False) -> str:
-    """Emit `count` straight-line integer statements that the toolchain lowers.
-
-    We alternate a few additions to variables and to an accumulator to avoid
-    being optimized away and to ensure a stable instruction footprint.
-    """
-    if count <= 0:
-        return ""
-    lines: List[str] = []
+def _int_unit_lines(idx: int, use_globals: bool, ops_per_unit: int) -> list[str]:
     a = 'ga' if use_globals else 'a'
     b = 'gb' if use_globals else 'b'
     s = 'gs' if use_globals else 's'
+    k = (idx % 5) + 1
+    unit = []
+    # Minimal ops that survive -O0 and map to MLIR/quantum ops.
+    patterns = [
+        f"  {a} = {a} + {k};\n",
+        f"  {s} = {s} + {a};\n",
+        f"  {b} = {b} + 1;\n",
+        f"  {s} = {s} + {b};\n",
+    ]
+    for i in range(max(1, ops_per_unit)):
+        unit.append(patterns[i % len(patterns)])
+    return unit
+
+
+def make_int_ops(count: int, use_globals: bool = False, ops_per_unit: int = 2) -> str:
+    """Emit `count` integer-op units. Each unit has `ops_per_unit` statements.
+
+    ops_per_unit controls the effective Ir slope per step. With our gcc -O0
+    setup, 1 stmt ~= ~3–4 instructions; 2 stmts ~= ~7–8; 4 stmts ~= ~14–16.
+    """
+    if count <= 0:
+        return ""
+    lines: list[str] = []
     for i in range(int(count)):
-        k = (i % 5) + 1
-        lines.append(f"  {a} = {a} + {k};\n")
-        lines.append(f"  {s} = {s} + {a};\n")
-        lines.append(f"  {b} = {b} + 1;\n")
-        lines.append(f"  {s} = {s} + {b};\n")
+        lines.extend(_int_unit_lines(i, use_globals=use_globals, ops_per_unit=ops_per_unit))
     return "".join(lines)
 
 def make_nops(count: int) -> str:
@@ -171,7 +182,9 @@ def make_nops(count: int) -> str:
 def generate_c(cc_target: int, iters: int, ops_per_iter: int,
                pre_steps: int = 0, pre_ops: int = None, nops: int = 0,
                roi: bool = False, roi_region: str = "nops",
-               roi_mode: str = "func") -> str:
+               roi_mode: str = "func",
+               roi_unit_ops: int = 2,
+               dup_main_roi: bool = True) -> str:
     """Create a C program aiming for given CC and iteration-controlled Ir.
 
     CC model: 1 (base) + n_if + (1 if iters>0 else 0) ~= cc_target
@@ -197,7 +210,7 @@ def generate_c(cc_target: int, iters: int, ops_per_iter: int,
         # Global working variables for ROI function
         parts.append("static int ga=1, gb=2, gs=0;\n")
         parts.append("void __attribute__((noinline)) roi_block(void) {\n")
-        parts.append(make_int_ops(nops, use_globals=True))
+        parts.append(make_int_ops(nops, use_globals=True, ops_per_unit=roi_unit_ops))
         parts.append("}\n\n")
 
     # Begin main
@@ -219,13 +232,14 @@ def generate_c(cc_target: int, iters: int, ops_per_iter: int,
         if roi and roi_mode == "func" and roi_region == "nops":
             parts.append("  roi_block();\n")
             # Duplicate ROI ops in main so they are visible to the pipeline
-            parts.append(make_int_ops(nops))
+            if dup_main_roi:
+                parts.append(make_int_ops(nops, use_globals=False, ops_per_unit=roi_unit_ops))
         elif roi and roi_mode == "macro" and roi_region == "nops":
             parts.append("  CALLGRIND_ZERO_STATS;\n  CALLGRIND_START_INSTRUMENTATION;\n")
-            parts.append(make_int_ops(nops))
+            parts.append(make_int_ops(nops, use_globals=False, ops_per_unit=roi_unit_ops))
             parts.append("  CALLGRIND_STOP_INSTRUMENTATION;\n")
         else:
-            parts.append(make_int_ops(nops))
+            parts.append(make_int_ops(nops, use_globals=False, ops_per_unit=roi_unit_ops))
     parts.append(FOOTER)
     return "".join(parts)
 
@@ -311,6 +325,7 @@ def main():
     ap_grid.add_argument("--roi", action="store_true", help="Enable ROI (recommended for exact-k)")
     ap_grid.add_argument("--roi-region", choices=["nops", "loop"], default="nops")
     ap_grid.add_argument("--roi-mode", choices=["func", "macro"], default="func")
+    ap_grid.add_argument("--roi-unit-ops", type=int, default=2, help="Statements per ROI unit (1=~3-4 Ir, 2=~7-8, 4=~14-16)")
     def _cmd_grid(args):
         out = pathlib.Path(args.out_dir)
         for cc in range(args.cc_min, args.cc_max + 1):
@@ -320,7 +335,7 @@ def main():
                     iters = 0
                     pre_steps = 0
                     nops = idx + 1
-                    src = generate_c(cc, iters, args.ops_per_iter, pre_steps=pre_steps, pre_ops=args.pre_ops, nops=nops, roi=args.roi, roi_region=args.roi_region, roi_mode=args.roi_mode)
+                    src = generate_c(cc, iters, args.ops_per_iter, pre_steps=pre_steps, pre_ops=args.pre_ops, nops=nops, roi=args.roi, roi_region=args.roi_region, roi_mode=args.roi_mode, roi_unit_ops=args.roi_unit_ops)
                     name = f"cc{cc:02d}_k{idx+1:02d}_iters{iters}_ops{args.ops_per_iter}_pre{pre_steps}x{args.pre_ops}_nops{nops}_roi{int(args.roi)}_{args.roi_region}_{args.roi_mode}.c"
                 elif cc <= args.no_loop_upto_cc:
                     iters = 0

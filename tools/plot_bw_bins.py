@@ -122,25 +122,32 @@ def main() -> None:
     cmap = ListedColormap(["white", "black"])  # 0->white, 1->black
     im = ax.imshow(M, origin="lower", aspect="auto", cmap=cmap, vmin=0, vmax=1)
 
-    # Ticks at bin centers
-    def centers(edges: List[float]) -> List[float]:
-        return [(edges[i] + edges[i+1]) / 2.0 for i in range(len(edges)-1)]
-    x_cent = centers(x_edges)
-    y_cent = centers(y_edges)
+    # Tick labels based on bin LEFT edges so widths map to expected integers
+    W = len(x_edges) - 1
+    H = len(y_edges) - 1
 
-    # Limit tick count for readability
-    def pick_ticks(vals: List[float], max_ticks: int = 20) -> List[int]:
-        if len(vals) <= max_ticks:
-            return list(range(len(vals)))
-        step = max(1, len(vals) // max_ticks)
-        return list(range(0, len(vals), step))
+    # Limit tick count for readability (by index)
+    def pick_idx(n: int, max_ticks: int = 20) -> List[int]:
+        if n <= max_ticks:
+            return list(range(n))
+        step = max(1, n // max_ticks)
+        return list(range(0, n, step))
 
-    xi = pick_ticks(x_cent, max_ticks=15)
-    yi = pick_ticks(y_cent, max_ticks=15)
+    xi = pick_idx(W, max_ticks=15)
+    yi = pick_idx(H, max_ticks=15)
+
+    # Build labels from left edges
+    def fmt(v: float) -> str:
+        iv = int(round(v))
+        return str(iv) if abs(v - iv) < 1e-6 else f"{v:.2g}"
+
+    x_labels = [fmt(x_edges[i]) for i in xi]
+    y_labels = [fmt(y_edges[j]) for j in yi]
+
     ax.set_xticks(xi)
-    ax.set_xticklabels([f"{x_cent[i]:.0f}" for i in xi], rotation=45, ha="right")
+    ax.set_xticklabels(x_labels, rotation=45, ha="right")
     ax.set_yticks(yi)
-    ax.set_yticklabels([f"{y_cent[i]:.0f}" for i in yi])
+    ax.set_yticklabels(y_labels)
 
     ax.set_xlabel(args.x)
     ax.set_ylabel(args.y)
@@ -155,4 +162,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
