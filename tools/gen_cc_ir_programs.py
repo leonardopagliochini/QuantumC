@@ -1,34 +1,33 @@
 #!/usr/bin/env python3
 """
-Generate C programs using only admissible operations (ints, + - * /, if/for)
-with deterministic cyclomatic complexity and controllable instruction count.
+Generate C programs that are fully compatible with the QuantumC pipeline.
 
-Approach
-- Cyclomatic complexity (CC): create `m` independent if-statements plus an
-  optional for-loop. Lizard counts each `if` and the `for` as decision points.
-  Thus: CC ~= 1 + m + (1 if loop is present else 0).
-- Instruction count (Ir): controlled by running a for-loop with a selectable
-  number of iterations and a fixed arithmetic body. Dynamic Ir grows roughly
-  linearly with the iteration count.
+Design (simplified and enforced):
+- One function only: `main`.
+- Only pipeline-accepted integer operations: +, -, *, /, and top-level `if`s.
+- No globals, no helper functions, no ROI, no inline asm, no macros.
+- No loops are emitted; instruction count is controlled via straight-line
+  repetitions of simple arithmetic in `main` ("pre-work").
 
-CLI
-  Generate a single program with given CC and iterations:
-    python tools/gen_cc_ir_programs.py gen-one \
-      --out-dir corpus_synth --cc 8 --iters 2000 --ops-per-iter 8
+Cyclomatic complexity (CC):
+- CC ~= 1 + (#top-level ifs). We set `#ifs = cc - 1`.
 
-  Generate a range of programs with fixed CC and varying iterations:
-    python tools/gen_cc_ir_programs.py gen-range \
-      --out-dir corpus_synth --cc 8 --base-iters 1500 --step 150 --k 30
+Instruction count (Ir):
+- With `--pre-ops 1` each pre-work step adds one statement such as `a = a + b;`.
+  At -O0 this increases Ir by ~3–4, keeping adjacent samples within ≤5.
 
-You can then scan the folder using:
-    conda run -n cotenv python tools/scan_cc_ir.py --corpus corpus_synth \
-      --show-stages --progress plain --out tools/results/cc_ir_synth.csv
+CLI (simplified common flows):
+- Generate a CC×k grid without loops:
+    python tools/gen_cc_ir_programs.py gen-grid \
+      --out-dir corpus_cc10x10_noloop \
+      --cc-min 1 --cc-max 10 \
+      --k 10 \
+      --ops-per-iter 1 \
+      --no-loop-upto-cc 10 \
+      --pre-base 1 --pre-step 1 --pre-ops 1
 
-Notes
-- This script does not call valgrind/lizard; it only emits C.
-- To approximate a desired Ir, increase/decrease `--iters` (and optionally
-  `--ops-per-iter`). For exact targeting, you can calibrate slope externally by
-  scanning two samples with different iteration counts and interpolating.
+Notes:
+- This script emits only C; scanning/measurement is handled by tools/scan_cc_ir.py.
 """
 
 import argparse
@@ -87,36 +86,11 @@ def make_if_chain(n: int) -> str:
 
 
 def make_work_loop(iters: int, ops_per_iter: int) -> str:
-    """Emit a for-loop that performs pure integer arithmetic per iteration.
+    """Disabled in simplified mode: we do not emit loops.
 
-    Only uses +, -, *, / and integer variables. No modulo, bitwise, or IO.
+    Kept for API compatibility; always returns an empty string.
     """
-    if iters <= 0:
-        return ""
-    body_ops: List[str] = []
-    # A compact body of operations; repeat to scale cost per iter
-    core = [
-        "a = a + b;",
-        "b = b + 1;",
-        "s = s + a;",
-        "a = a * 3 - 1;",
-        "b = b * 2 + 1;",
-        "s = s + b;",
-        "s = s - a / 3;",
-        "s = s + b / 5;",
-    ]
-    # Choose as many operations as requested (cycle over core)
-    seq: List[str] = []
-    for i in range(max(1, ops_per_iter)):
-        seq.append(core[i % len(core)])
-    joined = " ".join(seq)
-    body_ops.append(f"    {joined}\n")
-
-    return "".join([
-        f"  for (int i = 0; i < {int(iters)}; i = i + 1) {{\n",
-        *body_ops,
-        "  }\n",
-    ])
+    return ""
 
 
 def make_prework(steps: int, ops_per_iter: int) -> str:
@@ -185,61 +159,24 @@ def generate_c(cc_target: int, iters: int, ops_per_iter: int,
                roi_mode: str = "func",
                roi_unit_ops: int = 2,
                dup_main_roi: bool = True) -> str:
-    """Create a C program aiming for given CC and iteration-controlled Ir.
+    """Create a C program with only pipeline-accepted ops in `main`.
 
-    CC model: 1 (base) + n_if + (1 if iters>0 else 0) ~= cc_target
-    => n_if = max(0, cc_target - 1 - loop_cc)
+    Simplified: no loops, no ROI, no globals, no inline asm.
+    CC model: CC ~= 1 + n_if, where n_if = max(0, cc_target - 1).
+    Ir control: straight-line pre-work repeated `pre_steps` times with `pre_ops`
+    statements per step (default `ops_per_iter` if not specified).
     """
-    include_loop = iters > 0
-    loop_cc = 1 if include_loop else 0
-    n_if = cc_target - 1 - loop_cc
-    if n_if < 0:
-        # Can't hit cc_target exactly with a loop; remove loop if needed
-        if include_loop:
-            include_loop = False
-            iters = 0
-            loop_cc = 0
-            n_if = max(0, cc_target - 1)
-        else:
-            n_if = 0
-
-    parts: List[str] = [make_top(roi and roi_mode == "macro")]
-
-    # Optional function-based ROI: define roi_block() before main and call it from main
-    if roi and roi_mode == "func" and nops > 0 and roi_region == "nops":
-        # Global working variables for ROI function
-        parts.append("static int ga=1, gb=2, gs=0;\n")
-        parts.append("void __attribute__((noinline)) roi_block(void) {\n")
-        parts.append(make_int_ops(nops, use_globals=True, ops_per_unit=roi_unit_ops))
-        parts.append("}\n\n")
-
+    n_if = max(0, cc_target - 1)
+    parts: List[str] = []
     # Begin main
     parts.append(MAIN_BEGIN)
-
-    # Optional straight-line pre-work to vary Ir without adding CC
+    # Straight-line pre-work to vary Ir without adding loop CC
     if pre_steps > 0:
         parts.append(make_prework(pre_steps, pre_ops if pre_ops is not None else ops_per_iter))
+    # Top-level if chain to reach CC target
     if n_if > 0:
         parts.append(make_if_chain(n_if))
-    if include_loop:
-        if roi and roi_region == "loop":
-            parts.append("  CALLGRIND_ZERO_STATS;\n  CALLGRIND_START_INSTRUMENTATION;\n")
-        parts.append(make_work_loop(iters, ops_per_iter))
-        if roi and roi_region == "loop":
-            parts.append("  CALLGRIND_STOP_INSTRUMENTATION;\n")
-    # ROI ops region: use integer ops so toolchain lowers them
-    if nops > 0:
-        if roi and roi_mode == "func" and roi_region == "nops":
-            parts.append("  roi_block();\n")
-            # Duplicate ROI ops in main so they are visible to the pipeline
-            if dup_main_roi:
-                parts.append(make_int_ops(nops, use_globals=False, ops_per_unit=roi_unit_ops))
-        elif roi and roi_mode == "macro" and roi_region == "nops":
-            parts.append("  CALLGRIND_ZERO_STATS;\n  CALLGRIND_START_INSTRUMENTATION;\n")
-            parts.append(make_int_ops(nops, use_globals=False, ops_per_unit=roi_unit_ops))
-            parts.append("  CALLGRIND_STOP_INSTRUMENTATION;\n")
-        else:
-            parts.append(make_int_ops(nops, use_globals=False, ops_per_unit=roi_unit_ops))
+    # Footer
     parts.append(FOOTER)
     return "".join(parts)
 
@@ -322,31 +259,16 @@ def main():
     ap_grid.add_argument("--pre-step", type=int, default=1, help="Delta pre-work per index for no-loop rows")
     ap_grid.add_argument("--pre-ops", type=int, default=8, help="Ops per pre-work repetition")
     ap_grid.add_argument("--exact-k", action="store_true", help="Use inline NOPs to achieve Ir = M_cc + k exactly (no loop)")
-    ap_grid.add_argument("--roi", action="store_true", help="Enable ROI (recommended for exact-k)")
-    ap_grid.add_argument("--roi-region", choices=["nops", "loop"], default="nops")
-    ap_grid.add_argument("--roi-mode", choices=["func", "macro"], default="func")
-    ap_grid.add_argument("--roi-unit-ops", type=int, default=2, help="Statements per ROI unit (1=~3-4 Ir, 2=~7-8, 4=~14-16)")
+    # ROI/loops are disabled in simplified mode; the flags are ignored if present.
     def _cmd_grid(args):
         out = pathlib.Path(args.out_dir)
         for cc in range(args.cc_min, args.cc_max + 1):
             for idx in range(args.k):
-                if args.exact_k:
-                    # Exact Ir control via NOPs: disable loop and pre-work, set nops=k
-                    iters = 0
-                    pre_steps = 0
-                    nops = idx + 1
-                    src = generate_c(cc, iters, args.ops_per_iter, pre_steps=pre_steps, pre_ops=args.pre_ops, nops=nops, roi=args.roi, roi_region=args.roi_region, roi_mode=args.roi_mode, roi_unit_ops=args.roi_unit_ops)
-                    name = f"cc{cc:02d}_k{idx+1:02d}_iters{iters}_ops{args.ops_per_iter}_pre{pre_steps}x{args.pre_ops}_nops{nops}_roi{int(args.roi)}_{args.roi_region}_{args.roi_mode}.c"
-                elif cc <= args.no_loop_upto_cc:
-                    iters = 0
-                    pre_steps = args.pre_base + idx * args.pre_step
-                    src = generate_c(cc, iters, args.ops_per_iter, pre_steps=pre_steps, pre_ops=args.pre_ops)
-                    name = f"cc{cc:02d}_idx{idx:03d}_iters{iters}_ops{args.ops_per_iter}_pre{pre_steps}x{args.pre_ops}.c"
-                else:
-                    iters = args.base_iters + idx * args.step
-                    pre_steps = 0
-                    src = generate_c(cc, iters, args.ops_per_iter, pre_steps=pre_steps, pre_ops=args.pre_ops)
-                    name = f"cc{cc:02d}_idx{idx:03d}_iters{iters}_ops{args.ops_per_iter}_pre{pre_steps}x{args.pre_ops}.c"
+                # Simplified mode: always no loops, Ir via pre-work only
+                iters = 0
+                pre_steps = args.pre_base + idx * args.pre_step
+                src = generate_c(cc, iters, args.ops_per_iter, pre_steps=pre_steps, pre_ops=args.pre_ops)
+                name = f"cc{cc:02d}_idx{idx:03d}_iters{iters}_ops{args.ops_per_iter}_pre{pre_steps}x{args.pre_ops}.c"
                 path = write_file(out, name, src)
                 print(f"[gen-grid] Wrote: {path}")
     ap_grid.set_defaults(func=_cmd_grid)

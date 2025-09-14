@@ -290,8 +290,7 @@ def main():
     ap.add_argument("--out", type=str, default=None, help="Output CSV (default: tools/results/<corpus>_cc_ir.csv)")
     ap.add_argument("--progress", choices=["auto", "plain", "none"], default="auto")
     ap.add_argument("--show-stages", action="store_true", help="Log sintetico per file")
-    ap.add_argument("--roi", action="store_true", help="Usa Callgrind con --instr-atstart=no per misurare solo il ROI")
-    ap.add_argument("--roi-func", type=str, default=None, help="Se impostato, usa --toggle-collect=<func> (es. roi_block)")
+    # Simplified: ROI is disabled; measurement is whole-program Ir only.
     args = ap.parse_args()
 
     corpus = pathlib.Path(args.corpus)
@@ -361,8 +360,8 @@ def main():
                         arch=args.arch,
                         run_cmd=args.input_cmd,
                         stage_writer=None,  # avoid interleaved stage logs in parallel
-                        roi=args.roi,
-                        roi_func=args.roi_func,
+                        roi=False,          # always whole-program Ir
+                        roi_func=None,
                     ): c_path for c_path in to_process
                 }
                 for fut in concurrent.futures.as_completed(future_map):

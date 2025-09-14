@@ -58,69 +58,36 @@
 
 ### A. Generate corpora — `tools/gen_cc_ir_programs.py`
 
-Recommended call (after activating your env, e.g., `conda activate cotenv`):
+Simplified, pipeline-compatible generation (no loops, no ROI). After activating your env (e.g., `conda activate cotenv`):
 
 ```
 python tools/gen_cc_ir_programs.py gen-grid \
-  --out-dir corpus_grid10 \
+  --out-dir corpus_cc10x10_noloop \
   --cc-min 1 --cc-max 10 \
   --k 10 \
-  --exact-k \
-  --roi --roi-region nops --roi-mode func \
-  --roi-unit-ops 1 \
-  --ops-per-iter 1
+  --ops-per-iter 1 \
+  --no-loop-upto-cc 10 \
+  --pre-base 1 --pre-step 1 --pre-ops 1
 ```
 
-This generates a 10×10 grid (CC=1..10, k=1..10) where ROI uses integer-only ops; ROI size grows with k; Ir steps are small (~+3 per k) for higher resolution.
+This generates a 10×10 grid (CC=1..10, k=1..10) with only `main`, integer ops (+,-,*,/), and top-level `if`s. Ir increases ~3–4 per step (≤5 bin) via straight-line pre-work; no globals, no macros, no asm.
 
-- **Subcommands:**
-  - `gen-one`: emit a single C program.
-  - `gen-range`: fixed CC, vary iteration count (legacy) or ROI size.
-  - `gen-grid`: sweep CC over a range and generate `k` variants per CC (preferred for datasets).
-
-- **Common flags:**
-  - `--out-dir DIR`: output directory for generated `.c` files.
-  - `--cc INT`: target cyclomatic complexity for `gen-one`/`gen-range`.
-  - `--ops-per-iter INT`: legacy loop-body size (not needed for ROI usage).
-
-- **ROI-related flags (recommended):**
-  - `--roi`: enable region-of-interest generation.
-  - `--roi-region nops`: select the ROI in the generator (kept as name; generates integer ops).
-  - `--roi-mode func`: emit `roi_block()` as a separate function (enables Callgrind toggling).
-  - `--roi-unit-ops INT`: integer statements per ROI unit (controls Ir slope: 1≈+3, 2≈+7–8, 4≈+14–16).
-  - Internally, the generator duplicates the ROI ops in `main` so the toolchain lowers them to quantum IR (no extra flags needed).
-
-- **`gen-grid` flags:**
-  - `--cc-min INT --cc-max INT`: CC range (inclusive).
-  - `--k INT`: number of ROI sizes (units) per CC row.
-  - `--exact-k`: instructs the generator to use the ROI-based path (no loops) with `k = 1..K` units.
-  - Example (10×10 grid, small Ir steps):
-    - `conda run -n cotenv python tools/gen_cc_ir_programs.py gen-grid \
-       --out-dir corpus_grid10 \
-       --cc-min 1 --cc-max 10 --k 10 \
-       --exact-k --roi --roi-region nops --roi-mode func \
-       --roi-unit-ops 1`
-
-### B. Measure Ir — `tools/scan_cc_ir.py`
+### B. Measure CC + Ir — `tools/scan_cc_ir.py`
 
 Recommended call (after activating your env):
 
 ```
 python tools/scan_cc_ir.py \
-  --corpus corpus_grid10 \
-  --roi --roi-func roi_block \
-  --progress plain
+  --corpus corpus_cc10x10_noloop \
+  --progress plain --show-stages \
+  --cc gcc --arch x86-64 \
+  --out tools/results/corpus_cc10x10_noloop_cc_ir.csv
 ```
 
-This measures only the ROI (`roi_block`) with Callgrind and writes `tools/results/corpus_grid10_cc_ir.csv`.
+This computes cyclomatic complexity (Lizard) and whole-program Ir (Callgrind).
 
 - **Required:**
   - `--corpus DIR`: folder with the generated `.c` programs.
-
-- **ROI mode (recommended):**
-  - `--roi`: run Callgrind with `--collect-atstart=no`.
-  - `--roi-func roi_block`: toggles collection for the ROI function.
-  - This makes `Ir` measure only the ROI ops.
 
 - **Other flags:**
   - `--cc gcc`: C compiler (default `gcc`).
@@ -134,6 +101,35 @@ This measures only the ROI (`roi_block`) with Callgrind and writes `tools/result
      --corpus corpus_grid10 \
      --roi --roi-func roi_block \
      --progress plain`
+
+### B.1 Flatten ROI corpora for toolchain compatibility — `tools/inline_roi_to_main.py`
+
+Some generated programs (ROI via helper function) use file-scope globals and a `roi_block()` function that the current C→Quantum toolchain does not lower. To keep the dataset stable and consumable without changing the toolchain, flatten programs so only local `int` ops remain in `main`, and instrument the ROI region with Callgrind client macros.
+
+Recommended workflow:
+
+```
+# Flatten and instrument the ROI inside main
+python tools/inline_roi_to_main.py \
+  --in corpus_grid10 \
+  --out corpus_grid10_flat \
+  --instrument
+
+# Measure Ir or run whole benchmark on the flattened corpus
+python tools/scan_cc_ir.py \
+  --corpus corpus_grid10_flat \
+  --progress plain
+```
+
+- What the flattener does:
+  - Removes ROI globals and the `roi_block()` definition.
+  - Removes the `roi_block();` call in `main`.
+  - Adds a safe header/defines and wraps the ROI ops in `main` with
+    `CALLGRIND_ZERO_STATS; CALLGRIND_START_INSTRUMENTATION; ...; CALLGRIND_STOP_INSTRUMENTATION;`.
+- Options:
+  - `--inline-body`: also inline the ROI body mapping `ga/gb/gs → a/b/s`. Off by default to avoid double-counting (generators already duplicate ROI ops in `main`).
+- Notes:
+  - For flattened corpora, you don’t need `--roi`/`--roi-func` flags; the client macros control collection. If you keep `--roi-func`, ensure it targets an existing function (not `roi_block`, which was removed).
 
 ### C. Normalize/transform CSVs
 
@@ -238,3 +234,41 @@ python tools/plot_bw_bins.py \
 - Choose `--roi-unit-ops` to match your bin width (e.g., Y=10 wide bins pair well with ~+7–8 or ~+14–16 slopes).
 - Absolute Ir varies by platform; the **pattern** (slope and monotonicity) is what you’ll use for bin coverage and trend analysis.
 - The generator uses only integer arithmetic; no asm or includes are required for the dataset used in correlations.
+
+---
+
+### E. Whole pipeline benchmark — `tools/whole_benchmark.py`
+
+This program runs a parallel, end-to-end benchmark per C file, collecting:
+- CC (Lizard), Ir (Callgrind), QASM circuit metrics (num_qubits, total_gates, cx, measure, u1,u2,u3, depth)
+- Pipeline-only timings (wall, user, sys) and memory:
+  - Measured by executing the pipeline in a child Python process under `/usr/bin/time -v`.
+  - Peak RSS (max_rss_kb) extracted from `time -v` and process status fields (VmSize, VmData, VmStk, VmExe, VmLib, VmRSS, VmHWM) read from `/proc/<pid>/status` inside the child.
+  - This intentionally excludes the runtime/memory of external tools (Lizard, Callgrind, callgrind_annotate).
+- Compiled binary path (for Callgrind) and QASM path are recorded.
+- Work is parallelized across files and results are sorted by `(cyclomatic, ir_instructions, file)`.
+
+Recommended call (after activating your env):
+
+```
+python tools/whole_benchmark.py \
+  --corpus corpus_grid10_flat \
+  --out tools/results/corpus_grid10_whole_benchmark.csv \
+  --cc gcc \
+  --arch x86-64 \
+  --bits 16 \
+  --max-iter 30 \
+  --progress plain \
+  --show-stages \
+  --ir-roi-func roi_block \
+  --max-workers 0
+```
+
+Flags:
+- `--corpus`: input folder with `.c` files.
+- `--out`: output CSV (default: `tools/results/<corpus>_whole_benchmark.csv`).
+- `--cc/--arch`: compiler and optional arch hint for the binary used by Callgrind.
+- `--bits/--max-iter`: parameters for the pipeline (C→QASM). Only the pipeline subprocess is timed and memory-profiled.
+- `--ir-roi-func roi_block`: optional; if provided, Ir is collected for ROI only via `--toggle-collect=roi_block`. This does not affect the pipeline timing.
+- `--max-workers`: number of parallel workers (default: CPU cores − 1). Use `0` or omit to use the default.
+- Output columns include: `file, cyclomatic, ir_instructions, num_qubits, total_gates, num_cx, num_measure, num_u1, num_u2, num_u3, depth, wall_time_s, user_time_s, sys_time_s, max_rss_kb, VmSize_kB, VmData_kB, VmStk_kB, VmExe_kB, VmLib_kB, VmRSS_kB, VmHWM_kB, bin_path, qasm_path`.
