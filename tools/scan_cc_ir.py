@@ -12,7 +12,7 @@ Opzioni utili:
   --cc gcc                  # compilatore C
   --arch x86-64             # arch target (facoltativo)
   --input-cmd "42\\n"       # input su stdin al binario (facoltativo)
-  --out tools/results/cc_ir.csv
+  --out tools/results/<corpus>_cc_ir.csv
   --progress auto|plain|none
   --show-stages             # log sintetico per file
 """
@@ -92,7 +92,7 @@ def compile_c_for_valgrind(c_path: pathlib.Path, out_bin: pathlib.Path, cc="gcc"
             cmd.insert(1, "-march=x86-64")
     subprocess.run(cmd, check=True)
 
-def callgrind_ir(bin_path: pathlib.Path, run_cmd: Optional[str] = None) -> Optional[int]:
+def callgrind_ir(bin_path: pathlib.Path, run_cmd: Optional[str] = None, instr_atstart_no: bool = False, toggle_func: Optional[str] = None) -> Optional[int]:
     """
     Esegue Valgrind/Callgrind e ritorna Ir, oppure None se non disponibile/fallisce.
     """
@@ -122,6 +122,12 @@ def callgrind_ir(bin_path: pathlib.Path, run_cmd: Optional[str] = None) -> Optio
             f"--callgrind-out-file={str(cg_out)}",
             str(tmp_bin)
         ]
+        # ROI control: prefer function-based toggle if provided
+        if toggle_func:
+            vg_cmd.insert(2, f"--toggle-collect={toggle_func}")
+            vg_cmd.insert(2, "--collect-atstart=no")
+        elif instr_atstart_no:
+            vg_cmd.insert(2, "--instr-atstart=no")
 
         res = subprocess.run(
             vg_cmd,
@@ -234,7 +240,7 @@ def _make_progress(total: int, mode: str, desc: str = ""):
 
 # ---------- Main per-file ----------
 def process_file(c_path: pathlib.Path, cc_compiler: str, arch: Optional[str],
-                 run_cmd: Optional[str], stage_writer=None) -> Dict[str, Optional[float]]:
+                 run_cmd: Optional[str], stage_writer=None, roi: bool = False, roi_func: Optional[str] = None) -> Dict[str, Optional[float]]:
     """
     Per ciascun file C:
       - calcola CC (Lizard)
@@ -265,7 +271,7 @@ def process_file(c_path: pathlib.Path, cc_compiler: str, arch: Optional[str],
     if binp is not None:
         try:
             if stage_writer: stage_writer(f"{c_path.name}: CALLGRIND…")
-            ir_val = callgrind_ir(binp, run_cmd=run_cmd)
+            ir_val = callgrind_ir(binp, run_cmd=run_cmd, instr_atstart_no=roi, toggle_func=roi_func)
             if stage_writer: stage_writer(f"{c_path.name}: CALLGRIND ✓ (Ir={ir_val if ir_val is not None else 'NA'})")
         except Exception:
             if stage_writer: stage_writer(f"{c_path.name}: CALLGRIND ✗")
@@ -280,9 +286,11 @@ def main():
     ap.add_argument("--cc", type=str, default="gcc", help="Compilatore C (default: gcc)")
     ap.add_argument("--arch", type=str, default=None, help="Arch target (es: x86-64, arm)")
     ap.add_argument("--input-cmd", type=str, default=None, help='Input su stdin al binario (es: "42\\n")')
-    ap.add_argument("--out", type=str, default=str(RESULTS_DIR / "cc_ir.csv"))
+    ap.add_argument("--out", type=str, default=None, help="Output CSV (default: tools/results/<corpus>_cc_ir.csv)")
     ap.add_argument("--progress", choices=["auto", "plain", "none"], default="auto")
     ap.add_argument("--show-stages", action="store_true", help="Log sintetico per file")
+    ap.add_argument("--roi", action="store_true", help="Usa Callgrind con --instr-atstart=no per misurare solo il ROI")
+    ap.add_argument("--roi-func", type=str, default=None, help="Se impostato, usa --toggle-collect=<func> (es. roi_block)")
     args = ap.parse_args()
 
     corpus = pathlib.Path(args.corpus)
@@ -303,7 +311,8 @@ def main():
         for c_path in c_files:
             try:
                 r = process_file(c_path, cc_compiler=args.cc, arch=args.arch,
-                                 run_cmd=args.input_cmd, stage_writer=stage_writer if args.show_stages else None)
+                                 run_cmd=args.input_cmd, stage_writer=stage_writer if args.show_stages else None,
+                                 roi=args.roi, roi_func=args.roi_func)
                 rows.append(dict(file=c_path.name, **r))
             except KeyboardInterrupt:
                 if progress: progress.write("Interrotto dall'utente")
@@ -316,7 +325,12 @@ def main():
     finally:
         if progress: progress.close()
 
-    out_csv = pathlib.Path(args.out)
+    # Determine default output name from corpus if not provided
+    if args.out is None:
+        corpus_name = corpus.name.rstrip(os.sep)
+        out_csv = RESULTS_DIR / f"{corpus_name}_cc_ir.csv"
+    else:
+        out_csv = pathlib.Path(args.out)
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     with out_csv.open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=["file", "cyclomatic", "ir_instructions"])
