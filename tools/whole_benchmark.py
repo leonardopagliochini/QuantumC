@@ -220,6 +220,7 @@ def compute_qasm_depth(qasm_text: str) -> int:
 
 
 def count_qasm_metrics(qasm_path: pathlib.Path) -> Dict[str, Optional[int]]:
+    """Match new_benchmarks: count total gates by non-header, non-barrier lines."""
     text = qasm_path.read_text()
     qubits = sum(int(m.group(1)) for m in _QREG_RE.finditer(text))
     num_cx = len(_CX_RE.findall(text))
@@ -227,10 +228,17 @@ def count_qasm_metrics(qasm_path: pathlib.Path) -> Dict[str, Optional[int]]:
     num_u1 = len(_U1_RE.findall(text))
     num_u2 = len(_U2_RE.findall(text))
     num_u3 = len(_U3_RE.findall(text))
+    total = 0
+    for raw in text.splitlines():
+        s = raw.strip()
+        if _is_comment_or_header(s):
+            continue
+        if s.startswith("barrier"):
+            continue
+        if s:
+            total += 1
     depth = compute_qasm_depth(text)
-    # total_gates as rough sum
-    total_gates = num_cx + num_measure + num_u1 + num_u2 + num_u3
-    return dict(num_qubits=qubits, total_gates=total_gates, num_cx=num_cx, num_measure=num_measure, num_u1=num_u1, num_u2=num_u2, num_u3=num_u3, depth=depth)
+    return dict(num_qubits=qubits, num_gates=total, num_cx=num_cx, num_measure=num_measure, num_u1=num_u1, num_u2=num_u2, num_u3=num_u3, depth=depth)
 
 
 # ---------- Toolchain subprocess (timing + memory) ----------
@@ -240,19 +248,10 @@ def run_toolchain_subprocess(c_path: pathlib.Path, bits: int, max_iter: int) -> 
     Returns (qasm_path, metrics_dict) where metrics include wall/user/sys times, max RSS, and /proc status fields from the child process.
     """
     code = f"""
-import json, os
+import json
 from pipeline import compile_c_file
-q = compile_c_file({json.dumps(str(c_path))}, run=False, max_iter={int(max_iter)})
-status = {{}}
-try:
-    with open(f"/proc/{{os.getpid()}}/status") as f:
-        for line in f:
-            if line.startswith(("VmSize:", "VmData:", "VmStk:", "VmExe:", "VmLib:", "VmRSS:", "VmHWM:")):
-                k, v = line.split(":", 1)
-                status[k.strip()] = v.strip()
-except Exception:
-    pass
-print(json.dumps({{"qasm": q, "proc_status": status}}))
+q = compile_c_file({json.dumps(str(c_path))}, num_bits={int(bits)}, run=True, max_iter={int(max_iter)})
+print(json.dumps({{"qasm": q}}))
 """
     # /usr/bin/time -v writes to stderr; JSON is printed to stdout
     cmd = ["/usr/bin/time", "-v", sys.executable, "-c", code]
@@ -267,13 +266,6 @@ print(json.dumps({{"qasm": q, "proc_status": status}}))
         "user_time_s": None,
         "sys_time_s": None,
         "max_rss_kb": None,
-        "VmSize_kB": None,
-        "VmData_kB": None,
-        "VmStk_kB": None,
-        "VmExe_kB": None,
-        "VmLib_kB": None,
-        "VmRSS_kB": None,
-        "VmHWM_kB": None,
     }
     # always record return code and raw outputs for diagnostics
     meta["returncode"] = proc.returncode
@@ -284,20 +276,6 @@ print(json.dumps({{"qasm": q, "proc_status": status}}))
     try:
         js = json.loads(proc.stdout.strip().splitlines()[-1]) if proc.stdout.strip() else {}
         qasm_path = js.get("qasm")
-        st = js.get("proc_status", {})
-        def pick(k):
-            v = st.get(k)
-            if not v:
-                return None
-            m = re.search(r"(\d+)", v)
-            return int(m.group(1)) if m else None
-        meta["VmSize_kB"] = pick("VmSize")
-        meta["VmData_kB"] = pick("VmData")
-        meta["VmStk_kB"] = pick("VmStk")
-        meta["VmExe_kB"] = pick("VmExe")
-        meta["VmLib_kB"] = pick("VmLib")
-        meta["VmRSS_kB"] = pick("VmRSS")
-        meta["VmHWM_kB"] = pick("VmHWM")
     except Exception:
         pass
     # parse time -v stderr if available
@@ -403,7 +381,7 @@ def process_file(
         errors.append(f"pipeline_exc: {type(e).__name__}")
 
     # Circuit metrics from QASM
-    qasm_metrics: Dict[str, Optional[int]] = {"num_qubits": None, "total_gates": None, "num_cx": None, "num_measure": None, "num_u1": None, "num_u2": None, "num_u3": None, "depth": None}
+    qasm_metrics: Dict[str, Optional[int]] = {"num_qubits": None, "num_gates": None, "num_cx": None, "num_measure": None, "num_u1": None, "num_u2": None, "num_u3": None, "depth": None}
     try:
         if qasm_path:
             qasm_p = pathlib.Path(qasm_path)
@@ -433,7 +411,7 @@ def process_file(
         "cyclomatic": cc_val,
         "ir_instructions": ir_val,
         "num_qubits": qasm_metrics.get("num_qubits"),
-        "total_gates": qasm_metrics.get("total_gates"),
+        "num_gates": qasm_metrics.get("num_gates"),
         "num_cx": qasm_metrics.get("num_cx"),
         "num_measure": qasm_metrics.get("num_measure"),
         "num_u1": qasm_metrics.get("num_u1"),
@@ -444,13 +422,7 @@ def process_file(
         "user_time_s": user_time_s,
         "sys_time_s": sys_time_s,
         "max_rss_kb": max_rss_kb,
-        "VmSize_kB": VmSize_kB,
-        "VmData_kB": VmData_kB,
-        "VmStk_kB": VmStk_kB,
-        "VmExe_kB": VmExe_kB,
-        "VmLib_kB": VmLib_kB,
-        "VmRSS_kB": VmRSS_kB,
-        "VmHWM_kB": VmHWM_kB,
+        # internal-only fields (bin/qasm paths, stderr) are not written to CSV
         "bin_path": str(binp),
         "qasm_path": qasm_path,
     }
@@ -478,6 +450,34 @@ def main():
         out_csv = RESULTS_DIR / f"{corpus.name}_whole_benchmark.csv"
     else:
         out_csv = pathlib.Path(args.out)
+
+    # Incremental mode: load existing rows (by filename) to skip duplicates
+    existing_set: set[str] = set()
+    if out_csv.exists():
+        try:
+            with out_csv.open("r", newline="", encoding="utf-8") as f:
+                rd = csv.DictReader(f)
+                for row in rd:
+                    fn = row.get("file")
+                    if fn:
+                        existing_set.add(fn)
+        except Exception:
+            existing_set = set()
+
+    # CSV header fields (metrics only — exclude paths and stderr)
+    fields = [
+        "file",
+        "cyclomatic","ir_instructions",
+        "num_qubits","num_gates","num_cx","num_measure","num_u1","num_u2","num_u3","depth",
+        "wall_time_s","user_time_s","sys_time_s","max_rss_kb",
+    ]
+
+    # Ensure header exists if creating a new file
+    if not out_csv.exists():
+        out_csv.parent.mkdir(parents=True, exist_ok=True)
+        with out_csv.open("w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=fields)
+            w.writeheader()
 
     # Progress
     def _make_progress(total: int, mode: str, desc: str = ""):
@@ -517,8 +517,19 @@ def main():
 
     progress = _make_progress(len(c_files), args.progress, "Files")
 
+    # Determine which files to process, skipping those already present
+    to_process: List[pathlib.Path] = []
+    for c_path in c_files:
+        if c_path.name in existing_set:
+            if args.show_stages and progress:
+                progress.write(f"{c_path.name}: SKIP — already in {out_csv.name}")
+            if progress: progress.update(1)
+        else:
+            to_process.append(c_path)
+
     # Parallel map
     results: List[Dict[str, Union[str, int, float, None]]] = []
+    ok_n = partial_n = err_n = 0
     max_workers = args.max_workers or max(1, (os.cpu_count() or 2) - 1)
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
@@ -531,7 +542,7 @@ def main():
                     arch=args.arch,
                     max_iter=args.max_iter,
                     ir_roi_func=args.ir_roi_func,
-                ): c_path for c_path in c_files
+                ): c_path for c_path in to_process
             }
             for fut in concurrent.futures.as_completed(futs):
                 c_path = futs[fut]
@@ -545,6 +556,45 @@ def main():
                     r["file"] = c_path.name
                 finally:
                     results.append(r)
+                    # update counters
+                    st = (r.get("status") or "").lower()
+                    if st == "ok": ok_n += 1
+                    elif st == "partial": partial_n += 1
+                    elif st == "error": err_n += 1
+
+                    # Fail-fast: error status, missing QASM, or any missing metric
+                    try:
+                        # Check qasm exists
+                        q_ok = False
+                        qp = r.get("qasm_path")
+                        if qp:
+                            try:
+                                q_ok = pathlib.Path(str(qp)).exists()
+                            except Exception:
+                                q_ok = False
+                        # Required metrics must be present (not None)
+                        required = [
+                            "cyclomatic","ir_instructions",
+                            "num_qubits","num_gates","num_cx","num_measure","num_u1","num_u2","num_u3","depth",
+                        ]
+                        missing = [k for k in required if r.get(k) is None]
+                        if (st == "error") or (not q_ok) or missing:
+                            if args.show_stages and progress:
+                                why = "error-status" if st == "error" else ("no-qasm" if not q_ok else f"missing-metrics: {','.join(missing)}")
+                                progress.write(f"{c_path.name}: FAIL-FAST — {why}; aborting")
+                            if progress: progress.close()
+                            sys.exit(1)
+                    except SystemExit:
+                        raise
+                    except Exception:
+                        pass
+
+                    # Append row immediately to CSV (avoid duplicates)
+                    if c_path.name not in existing_set:
+                        with out_csv.open("a", newline="", encoding="utf-8") as f:
+                            w = csv.DictWriter(f, fieldnames=fields)
+                            w.writerow({k: r.get(k) for k in fields})
+                        existing_set.add(c_path.name)
                     # stage log reflecting status
                     if args.show_stages and progress:
                         st = r.get("status") or "?"
@@ -570,41 +620,52 @@ def main():
     finally:
         if progress: progress.close()
 
-    # Sort rows
-    def _to_float(v):
-        try: return float(v)
-        except Exception: return float("inf")
-    def _to_int(v):
-        try: return int(v)
-        except Exception:
-            try: return int(float(v))
-            except Exception: return 10**18
-    results.sort(key=lambda r: (_to_float(r.get("cyclomatic")), _to_int(r.get("ir_instructions")), r.get("file") or ""))
+    # Finalize: read current CSV, de-duplicate by file, sort rows, and rewrite
+    try:
+        all_rows: List[Dict[str, Union[str, int, float, None]]] = []
+        with out_csv.open("r", newline="", encoding="utf-8") as f:
+            rd = csv.DictReader(f)
+            for row in rd:
+                all_rows.append(row)  # type: ignore[arg-type]
+        # De-duplicate by file, keeping the last occurrence
+        by_file: Dict[str, Dict[str, Union[str, int, float, None]]] = {}
+        for r in all_rows:
+            fn = str(r.get("file")) if r.get("file") is not None else None
+            if fn:
+                by_file[fn] = r
+        rows_uniq = list(by_file.values())
+        # Sorting helpers
+        def _to_float(v):
+            try:
+                return float(v)
+            except Exception:
+                return float("inf")
+        def _to_int(v):
+            try:
+                return int(v)
+            except Exception:
+                try:
+                    return int(float(v))
+                except Exception:
+                    return 10**18
+        rows_uniq.sort(key=lambda r: (_to_float(r.get("cyclomatic")), _to_int(r.get("ir_instructions")), str(r.get("file") or "")))
+        with out_csv.open("w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=fields)
+            w.writeheader()
+            # Ensure each row only has known fields
+            for r in rows_uniq:
+                w.writerow({k: r.get(k) for k in fields})
+    except Exception:
+        # Keep results even if sort fails; emit a warning to stderr
+        print("[WARN] Failed to sort/rewrite CSV; leaving progressive order.", file=sys.stderr)
 
-    # Write CSV
-    out_csv.parent.mkdir(parents=True, exist_ok=True)
-    fields = [
-        "file","status","error","warnings","cyclomatic","ir_instructions",
-        "num_qubits","total_gates","num_cx","num_measure","num_u1","num_u2","num_u3","depth",
-        "wall_time_s","user_time_s","sys_time_s","max_rss_kb",
-        "VmSize_kB","VmData_kB","VmStk_kB","VmExe_kB","VmLib_kB","VmRSS_kB","VmHWM_kB",
-        "bin_path","qasm_path",
-        "compile_stderr","pipeline_stderr",
-    ]
-    with out_csv.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fields)
-        w.writeheader()
-        w.writerows(results)
     # summary
     total = len(c_files)
-    ok_n = sum(1 for r in results if r.get("status") == "ok")
-    partial_n = sum(1 for r in results if r.get("status") == "partial")
-    err_n = sum(1 for r in results if r.get("status") == "error")
-    print(f"[RESULTS] Written: {out_csv}")
-    print(f"[SUMMARY] Files: {total} — ok={ok_n}, partial={partial_n}, error={err_n}")
+    print(f"[RESULTS] Written (sorted): {out_csv}")
+    print(f"[SUMMARY] Files: {total} — ok={ok_n}, partial={partial_n}, error={err_n}, skipped={total - len(to_process)}")
     if err_n:
         print("[ERRORS] First failures:")
-        for r in (x for x in results if x.get("status") == "error"):
+        for r in (x for x in results if (x.get("status") or "").lower() == "error"):
             print(f"  - {r.get('file')}: {r.get('error')}")
             err_n -= 1
             if err_n <= 0:
