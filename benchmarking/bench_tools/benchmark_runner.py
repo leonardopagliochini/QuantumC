@@ -47,6 +47,7 @@ METRIC_COLUMNS = [
     "depth",
     "user_time_s",
     "sys_time_s",
+    "cpu_time_s",
     "max_rss_kb",
 ]
 
@@ -199,6 +200,7 @@ def run_toolchain_subprocess(
         "stdout": proc.stdout,
         "user_time_s": None,
         "sys_time_s": None,
+        "cpu_time_s": None,
         "max_rss_kb": None,
     }
 
@@ -233,6 +235,13 @@ def run_toolchain_subprocess(
                 meta["max_rss_kb"] = int(val)
             except Exception:
                 pass
+
+    user_time = meta.get("user_time_s")
+    sys_time = meta.get("sys_time_s")
+    if isinstance(user_time, (int, float)) and isinstance(sys_time, (int, float)):
+        meta["cpu_time_s"] = float(user_time) + float(sys_time)
+    else:
+        meta["cpu_time_s"] = None
 
     return qasm_path, meta
 
@@ -283,8 +292,9 @@ def process_file(
     needs_qasm_metrics = bool(required_qasm_keys)
     needs_user_time = metrics_enabled.get("user_time_s", True)
     needs_sys_time = metrics_enabled.get("sys_time_s", True)
+    needs_cpu_time = metrics_enabled.get("cpu_time_s", True)
     needs_rss = metrics_enabled.get("max_rss_kb", True)
-    needs_timing = needs_user_time or needs_sys_time or needs_rss
+    needs_timing = needs_user_time or needs_sys_time or needs_cpu_time or needs_rss
     needs_pipeline = needs_qasm_metrics or needs_timing
 
     cyclomatic: Optional[float] = None
@@ -339,7 +349,10 @@ def process_file(
 
     qasm_metrics: Dict[str, Optional[int]] = {key: None for key in qasm_metric_keys}
     qasm_dest: Optional[pathlib.Path] = None
-    user_time_s = sys_time_s = max_rss_kb = None
+    user_time_s: Optional[float] = None
+    sys_time_s: Optional[float] = None
+    cpu_time_s: Optional[float] = None
+    max_rss_kb: Optional[int] = None
 
     if needs_pipeline:
         stage_writer(f"{c_path.name}: pipeline")
@@ -348,10 +361,18 @@ def process_file(
             qasm_path, meta = run_toolchain_subprocess(c_path, bits=bits, max_iter=max_iter)
             pipeline_stderr = meta.get("stderr") if isinstance(meta.get("stderr"), str) else None
 
-            if needs_user_time:
-                user_time_s = meta.get("user_time_s")  # type: ignore[assignment]
-            if needs_sys_time:
-                sys_time_s = meta.get("sys_time_s")  # type: ignore[assignment]
+            if needs_user_time or needs_cpu_time:
+                user_val = meta.get("user_time_s")
+                user_time_s = float(user_val) if isinstance(user_val, (int, float)) else None
+            if needs_sys_time or needs_cpu_time:
+                sys_val = meta.get("sys_time_s")
+                sys_time_s = float(sys_val) if isinstance(sys_val, (int, float)) else None
+            if needs_cpu_time:
+                cpu_val = meta.get("cpu_time_s")
+                if isinstance(cpu_val, (int, float)):
+                    cpu_time_s = float(cpu_val)
+                elif user_time_s is not None and sys_time_s is not None:
+                    cpu_time_s = user_time_s + sys_time_s
             if needs_rss:
                 max_rss_kb = meta.get("max_rss_kb")  # type: ignore[assignment]
 
@@ -398,6 +419,8 @@ def process_file(
         missing_required = True
     if needs_sys_time and sys_time_s is None:
         missing_required = True
+    if needs_cpu_time and cpu_time_s is None:
+        missing_required = True
     if needs_rss and max_rss_kb is None:
         missing_required = True
 
@@ -427,6 +450,7 @@ def process_file(
         "depth": qasm_metrics.get("depth") if metrics_enabled.get("depth", True) else None,
         "user_time_s": user_time_s if needs_user_time else None,
         "sys_time_s": sys_time_s if needs_sys_time else None,
+        "cpu_time_s": cpu_time_s if needs_cpu_time else None,
         "max_rss_kb": max_rss_kb if needs_rss else None,
         "qasm_path": str(qasm_dest) if qasm_dest else None,
         "ir_offset": None,

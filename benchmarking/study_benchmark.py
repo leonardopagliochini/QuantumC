@@ -9,8 +9,9 @@ The script reuses ``bench_tools.benchmark_runner`` to evaluate the C sources in
 metrics and artefacts into ``benchmarking/<study>/<study>_results`` using the
 same measurements collected by ``tools_old/whole_benchmark.py`` (timings,
 Callgrind Ir, QASM statistics, plus an ``ir_offset`` column with CC-wise
-baselines. Results are stored in ``<study>_metrics.csv`` inside the study
-results directory.
+baselines). The benchmark runner now also emits ``cpu_time_s`` which is the
+sum of the reported user and system times. Results are stored in
+``<study>_metrics.csv`` inside the study results directory.
 """
 
 from __future__ import annotations
@@ -99,6 +100,7 @@ DEFAULT_METRICS = {
     "depth": True,
     "user_time_s": True,
     "sys_time_s": True,
+    "cpu_time_s": True,
     "max_rss_kb": True,
 }
 
@@ -127,6 +129,11 @@ def _load_metrics(cfg: Dict[str, Any]) -> Dict[str, bool]:
             metrics["ir_instructions"] = True
         if not metrics.get("cyclomatic", True):
             metrics["cyclomatic"] = True
+    if metrics.get("cpu_time_s", True):
+        if not metrics.get("user_time_s", True):
+            metrics["user_time_s"] = True
+        if not metrics.get("sys_time_s", True):
+            metrics["sys_time_s"] = True
     return metrics
 
 

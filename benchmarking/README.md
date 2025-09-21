@@ -120,7 +120,10 @@ new name when regenerating from scratch.
   progress and whether to print per-file stage logs.
 - `[metrics]`: enable/disable individual columns in the output CSV (e.g. set
   `num_measure = false` to skip that measurement). Dependencies are handled for
-  you—requesting `ir_offset` forces `cyclomatic` and `ir_instructions` on.
+  you—requesting `ir_offset` forces `cyclomatic` and `ir_instructions` on,
+  while `cpu_time_s` automatically keeps both `user_time_s` and `sys_time_s`
+  enabled so the summed wall-clock figure is emitted alongside the individual
+  components.
 
 ### `study_analyze.cfg`
 
