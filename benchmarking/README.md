@@ -73,13 +73,22 @@ Each study lives under `benchmarking/<study>/` with three subfolders created by
    form once the run ends.
 
 4. **Analyse and plot metrics**
-   ```bash
-   conda run -n cotenv python benchmarking/study_analyze.py try0
-   ```
-   `study_analyze.py` parses the metrics CSV and builds the plot/fit artefacts
-   declared in `study_analyze.cfg`. Scatter plots are saved alongside
-   best-fitting curves and per-model CSV summaries. The plotting backend is
-   Matplotlib (Agg mode), so the step is non-interactive.
+ ```bash
+  conda run -n cotenv python benchmarking/study_analyze.py try0
+  ```
+  `study_analyze.py` parses the metrics CSV and builds the plot/fit artefacts
+  declared in `study_analyze.cfg`. Scatter plots are saved alongside
+  best-fitting curves and per-model CSV summaries. The plotting backend is
+  Matplotlib (Agg mode), so the step is non-interactive.
+
+To execute the three stages back-to-back with the default configs, run:
+
+```bash
+python benchmarking/study_run_pipeline.py <study>
+```
+The helper patches `study_generate.cfg` with the provided study name, reuses
+`study_benchmark.cfg` and `study_analyze.cfg`, and skips generation if the
+study directory already exists.
 
 Running the scripts repeatedly overwrites plots and fit summaries, while the
 generator refuses to clobber an existing study directory—delete it or choose a
@@ -168,4 +177,3 @@ same logic with TOML configs and clearer directory layouts.
 With these pieces in place you can iterate quickly: tweak the configs, regenerate
 datasets, rerun the pipeline, and keep the documentation above as the always-on
 reference for how each stage works.
-
