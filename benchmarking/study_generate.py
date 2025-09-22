@@ -280,6 +280,7 @@ def write_program(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    parser.add_argument("study", help="Study name (creates benchmarking/<study>/ directories)")
     parser.add_argument(
         "--config",
         required=False,
@@ -290,9 +291,13 @@ def main() -> None:
     cfg_path = pathlib.Path(args.config) if args.config else BENCH_DIR / "study_generate.cfg"
     cfg = _load_config(cfg_path)
 
-    study = cfg.get("study")
-    if not isinstance(study, str) or not study:
-        raise SystemExit("Config must define non-empty string 'study'")
+    study = args.study
+    cfg_study = cfg.get("study")
+    if cfg_study and cfg_study != study:
+        print(
+            f"[warn] ignoring study='{cfg_study}' from {cfg_path.name}; using CLI argument '{study}' instead",
+            file=sys.stderr,
+        )
 
     cc_values = cfg.get("cc_values")
     ir_values = cfg.get("ir_values")
@@ -348,6 +353,8 @@ def main() -> None:
             tol = 1
         return tol
 
+    single_offset_mode = len(offsets_sorted) == 1
+
     for cc_value in cc_list:
         base_ir, slope = calibrate_cc(cc_value, cache)
         summary.append((cc_value, base_ir, slope))
@@ -366,8 +373,11 @@ def main() -> None:
                 if next_offset is not None
                 else (offset - prev_offset if prev_offset is not None else 0)
             )
-            tol_low = tolerance_from_diff(diff_prev)
-            tol_high = tolerance_from_diff(diff_next)
+            if single_offset_mode:
+                tol_low = tol_high = 10
+            else:
+                tol_low = tolerance_from_diff(diff_prev)
+                tol_high = tolerance_from_diff(diff_next)
 
             target_ir = base_ir + offset
             pre_steps, extra_ops, actual_ir = search_pre_steps(

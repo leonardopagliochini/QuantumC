@@ -45,7 +45,7 @@ Each study lives under `benchmarking/<study>/` with three subfolders created by
 
 1. **Generate the corpus**
    ```bash
-   conda run -n cotenv python benchmarking/study_generate.py --config benchmarking/study_generate.cfg
+   conda run -n cotenv python benchmarking/study_generate.py <study> --config benchmarking/study_generate.cfg
    ```
    The generator calibrates each requested cyclomatic complexity (CC) level
    with Callgrind, discovers the instruction-count slope introduced by a single
@@ -54,7 +54,7 @@ Each study lives under `benchmarking/<study>/` with three subfolders created by
 
 2. **(Optional) Fast CC/Ir sanity check**
    ```bash
-   conda run -n cotenv python benchmarking/study_scan.py try0 --progress auto --show-stages
+   conda run -n cotenv python benchmarking/study_scan.py <study> --progress auto --show-stages
    ```
    `study_scan.py` is a convenience wrapper over
    `bench_tools/scan_cc_ir.py`. It recomputes CC (via Lizard) and Ir (via
@@ -64,7 +64,7 @@ Each study lives under `benchmarking/<study>/` with three subfolders created by
 
 3. **Benchmark through the QuantumC pipeline**
    ```bash
-   conda run -n cotenv python benchmarking/study_benchmark.py try0 --config benchmarking/study_benchmark.cfg
+   conda run -n cotenv python benchmarking/study_benchmark.py <study> --config benchmarking/study_benchmark.cfg
    ```
    The benchmarker leverages `bench_tools/benchmark_runner.py` to compile each
    C program, run it through the QuantumC pipeline, collect Callgrind metrics,
@@ -74,7 +74,7 @@ Each study lives under `benchmarking/<study>/` with three subfolders created by
 
 4. **Analyse and plot metrics**
  ```bash
-  conda run -n cotenv python benchmarking/study_analyze.py try0
+  conda run -n cotenv python benchmarking/study_analyze.py <study>
   ```
   `study_analyze.py` parses the metrics CSV and builds the plot/fit artefacts
   declared in `study_analyze.cfg`. Scatter plots are saved alongside
@@ -86,9 +86,8 @@ To execute the three stages back-to-back with the default configs, run:
 ```bash
 python benchmarking/study_run_pipeline.py <study>
 ```
-The helper patches `study_generate.cfg` with the provided study name, reuses
-`study_benchmark.cfg` and `study_analyze.cfg`, and skips generation if the
-study directory already exists.
+The helper reuses the default `study_*.cfg` files and skips the generation step
+automatically if `benchmarking/<study>/` already exists.
 
 Running the scripts repeatedly overwrites plots and fit summaries, while the
 generator refuses to clobber an existing study directory—delete it or choose a
@@ -98,7 +97,8 @@ new name when regenerating from scratch.
 
 ### `study_generate.cfg`
 
-- `study`: name of the study (creates `benchmarking/<study>/`).
+- Provide the study name on the CLI when invoking the generator; the config
+  does not need a `study` key.
 - `cc_values`: strictly increasing CC targets (positive integers). Each value
   determines how many top-level `if` statements the generator emits.
 - `ir_values`: strictly increasing offsets relative to the calibrated baseline
@@ -108,6 +108,8 @@ new name when regenerating from scratch.
 
 ### `study_benchmark.cfg`
 
+- Provide the study name on the CLI when invoking the benchmarker; the config
+  does not need a `study` key.
 - `bits`: number of qubits requested from the QuantumC pipeline.
 - `cc`: compiler used to build temporary binaries for Callgrind (`gcc` by
   default).

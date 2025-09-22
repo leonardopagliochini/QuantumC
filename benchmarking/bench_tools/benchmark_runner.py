@@ -495,6 +495,8 @@ def run_study(
     ir_roi_func: Optional[str] = None,
     max_workers: Optional[int] = None,
     metrics_enabled: Optional[Dict[str, bool]] = None,
+    batch_size: Optional[int] = None,
+    batch_pause_s: float = 0.0,
 ) -> pathlib.Path:
     ensure_pipeline_available()
 
@@ -568,6 +570,62 @@ def run_study(
     worker_count = max(1, max_workers) if max_workers is not None else max(1, (os.cpu_count() or 2) - 1)
     t0 = time.perf_counter()
 
+    effective_batch_size: Optional[int]
+    if batch_size is None or batch_size <= 0:
+        effective_batch_size = None
+    else:
+        effective_batch_size = batch_size
+
+    def _finalise_rows() -> None:
+        if "ir_offset" in active_metrics:
+            baseline_map: Dict[str, int] = {}
+
+            def _cc_key(val: Union[str, int, float, None]) -> Optional[str]:
+                if val is None:
+                    return None
+                try:
+                    return str(int(float(val)))
+                except Exception:
+                    return None
+
+            def _ir_int(val: Union[str, int, float, None]) -> Optional[int]:
+                if val is None:
+                    return None
+                try:
+                    if isinstance(val, (int, float)):
+                        return int(val)
+                    return int(float(val))
+                except Exception:
+                    try:
+                        return int(str(val))
+                    except Exception:
+                        return None
+
+            for row in rows:
+                cc_key = _cc_key(row.get("cyclomatic"))
+                ir_val = _ir_int(row.get("ir_instructions"))
+                if cc_key is None or ir_val is None:
+                    continue
+                current = baseline_map.get(cc_key)
+                if current is None or ir_val < current:
+                    baseline_map[cc_key] = ir_val
+
+            for row in rows:
+                cc_key = _cc_key(row.get("cyclomatic"))
+                ir_val = _ir_int(row.get("ir_instructions"))
+                if cc_key is None or ir_val is None:
+                    row["ir_offset"] = ""
+                    continue
+                base = baseline_map.get(cc_key)
+                row["ir_offset"] = float(ir_val - base) if base is not None else ""
+
+        _sort_rows(rows)
+        with out_csv.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({field: row.get(field, "") for field in fieldnames})
+
     def _emit(message: str) -> None:
         if progress == "none":
             return
@@ -576,7 +634,10 @@ def run_study(
         else:
             print(message)
 
-    if to_process:
+    def _process_batch(batch: List[pathlib.Path]) -> None:
+        nonlocal ok_n, partial_n, err_n
+        if not batch:
+            return
         with concurrent.futures.ThreadPoolExecutor(max_workers=worker_count) as executor:
             future_map = {
                 executor.submit(
@@ -593,7 +654,7 @@ def run_study(
                     show_stages=show_stages,
                     metrics_enabled=metrics_enabled,
                 ): c_path
-                for c_path in to_process
+                for c_path in batch
             }
 
             for future in concurrent.futures.as_completed(future_map):
@@ -650,57 +711,35 @@ def run_study(
                 if progress_obj is not None:
                     progress_obj.update(1)
 
+    if to_process:
+        index = 0
+        batch_counter = 0
+        total_to_process = len(to_process)
+        should_announce_batches = (
+            (effective_batch_size is not None and total_to_process > effective_batch_size)
+            or batch_pause_s > 0
+        )
+        while index < total_to_process:
+            if effective_batch_size is None:
+                current_batch = to_process[index:]
+            else:
+                current_batch = to_process[index : index + effective_batch_size]
+            batch_counter += 1
+            if should_announce_batches:
+                _emit(f"[batch] starting batch {batch_counter} ({len(current_batch)} files)")
+            _process_batch(current_batch)
+            index += len(current_batch)
+            _finalise_rows()
+            if index < total_to_process and batch_pause_s > 0:
+                _emit(f"[batch] sleeping for {batch_pause_s:.1f}s before next batch")
+                time.sleep(batch_pause_s)
+
     if progress_obj is not None:
         progress_obj.close()
 
-    if "ir_offset" in active_metrics:
-        baseline_map: Dict[str, int] = {}
-
-        def _cc_key(val: Union[str, int, float, None]) -> Optional[str]:
-            if val is None:
-                return None
-            try:
-                return str(int(float(val)))
-            except Exception:
-                return None
-
-        def _ir_int(val: Union[str, int, float, None]) -> Optional[int]:
-            if val is None:
-                return None
-            try:
-                if isinstance(val, (int, float)):
-                    return int(val)
-                return int(float(val))
-            except Exception:
-                try:
-                    return int(str(val))
-                except Exception:
-                    return None
-
-        for row in rows:
-            cc_key = _cc_key(row.get("cyclomatic"))
-            ir_val = _ir_int(row.get("ir_instructions"))
-            if cc_key is None or ir_val is None:
-                continue
-            current = baseline_map.get(cc_key)
-            if current is None or ir_val < current:
-                baseline_map[cc_key] = ir_val
-
-        for row in rows:
-            cc_key = _cc_key(row.get("cyclomatic"))
-            ir_val = _ir_int(row.get("ir_instructions"))
-            if cc_key is None or ir_val is None:
-                row["ir_offset"] = ""
-                continue
-            base = baseline_map.get(cc_key)
-            row["ir_offset"] = float(ir_val - base) if base is not None else ""
-
-    rows = _sort_rows(rows)
-    with out_csv.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for row in rows:
-            writer.writerow({field: row.get(field, "") for field in fieldnames})
+    if not to_process:
+        # Ensure offsets and ordering are refreshed even when nothing new ran.
+        _finalise_rows()
 
     dt = time.perf_counter() - t0
     print(

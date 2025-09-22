@@ -86,6 +86,24 @@ def _resolve_workers(value: Any) -> Optional[int]:
         raise SystemExit(f"Invalid 'workers' value in config: {value!r}")
 
 
+def _resolve_pause_seconds(value: Any) -> float:
+    if value is None:
+        return 0.0
+    if isinstance(value, (int, float)):
+        seconds = float(value)
+    else:
+        text = str(value).strip()
+        if not text:
+            return 0.0
+        try:
+            seconds = float(text)
+        except Exception:
+            raise SystemExit(f"Invalid 'batch_pause_s' value in config: {value!r}")
+    if seconds < 0:
+        raise SystemExit("'batch_pause_s' must be >= 0")
+    return seconds
+
+
 DEFAULT_METRICS = {
     "cyclomatic": True,
     "ir_instructions": True,
@@ -172,6 +190,13 @@ def main() -> None:
     workers = _resolve_workers(workers_raw)
     metrics_enabled = _load_metrics(cfg)
 
+    batch_pause_raw = cfg.get("batch_pause_seconds")
+    if batch_pause_raw is None:
+        batch_pause_raw = cfg.get("batch_pause_s")
+    batch_pause_s = _resolve_pause_seconds(batch_pause_raw)
+
+    batch_size = workers if workers is not None else None
+
     progress = _normalise_string(cfg.get("progress", "plain"))
     if progress not in {"plain", "auto", "none"}:
         progress = "plain"
@@ -189,6 +214,8 @@ def main() -> None:
         ir_roi_func=ir_roi_func,
         max_workers=workers,
         metrics_enabled=metrics_enabled,
+        batch_size=batch_size,
+        batch_pause_s=batch_pause_s,
     )
     print(f"[benchmark] CSV: {out_csv}")
 
