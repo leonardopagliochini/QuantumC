@@ -140,6 +140,21 @@ during `study_analyze.py`. Each `[[plots]]` table supports:
   near-zero polynomial coefficients, and reports every attempted fit in the
   summary CSV while showing only the best curve on the plot.
 
+`[[heatmaps]]` tables aggregate a metric across CC/Ir bins and display the
+result over a colour map. When you need a spatial view with elevation, add
+`[[surfaces]]` entries: they reuse the same aggregation knobs as heatmaps but
+render a Matplotlib 3D surface plus (optionally) an interactive Plotly HTML.
+Set `interactive_outfile` to control the HTML name (defaults to
+`<outfile>_interactive.html`), tweak the camera with `view_elev`/`view_azim`,
+and switch to a wireframe via `surface_kind = "wireframe"` if desired. The
+interactive export requires `plotly` to be installed in the active environment.
+Provide `paraview_outfile` to dump the aggregated surface as a VTK
+`STRUCTURED_GRID`, ready for ParaView (`Warp By Scalar` gives the same 3D
+profile as the Matplotlib plot). Use `paraview_scale` when you want to shrink or
+amplify the exported Z geometry before rendering. `x_tick_round` and
+`y_tick_round` (on heatmaps or surfaces) round axis labels to the nearest step so
+you can collapse awkward label pairs into cleaner approximate values.
+
 ## Core Helper Modules (`bench_tools/`)
 
 - **`gen_cc_ir_programs.py`** – emits pipeline-friendly C code with exact CC
