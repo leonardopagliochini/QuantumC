@@ -24,6 +24,16 @@ COEFF_REL_THRESHOLD = 0.01
 
 
 @dataclass
+class DerivedAxisSpec:
+    name: str
+    transform: str
+    columns: List[str]
+    mode: str = "all"
+    normalize: str = "max"
+    label: Optional[str] = None
+
+
+@dataclass
 class ScatterConfig:
     name: str
     outfile: str
@@ -128,6 +138,7 @@ class AnalyzeConfig:
     scatter_plots: List[ScatterConfig] = field(default_factory=list)
     heatmaps: List[HeatmapConfig] = field(default_factory=list)
     surface_plots: List[SurfaceConfig] = field(default_factory=list)
+    derived_axes: Dict[str, DerivedAxisSpec] = field(default_factory=dict)
 
 
 @dataclass
@@ -245,6 +256,128 @@ def _apply_axis_scale(ax: plt.Axes, log_x: bool, log_y: bool) -> None:
         ax.set_xscale("log")
     if log_y:
         ax.set_yscale("log")
+
+
+
+def _safe_float(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except Exception:
+        return None
+
+
+def _assign_derived_axis_values(rows: Sequence[Dict[str, Any]], spec: DerivedAxisSpec, values: Sequence[float]) -> None:
+    if not values:
+        return
+    norm_mode = (spec.normalize or "max").strip().lower()
+    if norm_mode in {"", "none", "raw"}:
+        for row, val in zip(rows, values):
+            row[spec.name] = float(val)
+        return
+    if norm_mode == "max":
+        max_abs = max(abs(val) for val in values)
+        if math.isclose(max_abs, 0.0, rel_tol=1e-12, abs_tol=1e-12):
+            for row in rows:
+                row[spec.name] = 0.0
+            return
+        for row, val in zip(rows, values):
+            row[spec.name] = float(val) / max_abs
+        return
+    raise ValueError(f"Unsupported normalization mode '{spec.normalize}' for derived axis '{spec.name}'")
+
+
+def _apply_axis_normalized_product_all(data: Sequence[Dict[str, Any]], spec: DerivedAxisSpec) -> None:
+    rows: List[Dict[str, Any]] = []
+    values: List[float] = []
+    for row in data:
+        product = 1.0
+        valid = True
+        for column in spec.columns:
+            val = _safe_float(row.get(column))
+            if val is None:
+                valid = False
+                break
+            product *= val
+        if valid:
+            rows.append(row)
+            values.append(product)
+    _assign_derived_axis_values(rows, spec, values)
+
+
+def _apply_axis_normalized_product_diagonal(data: Sequence[Dict[str, Any]], spec: DerivedAxisSpec) -> None:
+    columns = spec.columns
+    if not columns:
+        return
+    unique_values: List[List[float]] = []
+    for column in columns:
+        values = sorted({float(val) for val in (_safe_float(row.get(column)) for row in data) if val is not None})
+        if not values:
+            return
+        unique_values.append(values)
+    diag_len = min(len(vals) for vals in unique_values) if unique_values else 0
+    if diag_len <= 0:
+        return
+    row_map: Dict[Tuple[float, ...], List[Dict[str, Any]]] = defaultdict(list)
+    for row in data:
+        key_values: List[float] = []
+        for column in columns:
+            val = _safe_float(row.get(column))
+            if val is None:
+                key_values = []
+                break
+            key_values.append(val)
+        if not key_values:
+            continue
+        row_map[tuple(key_values)].append(row)
+    rows: List[Dict[str, Any]] = []
+    values: List[float] = []
+    for idx in range(diag_len):
+        key = tuple(unique_values[col_idx][idx] for col_idx in range(len(columns)))
+        matches = row_map.get(key)
+        if not matches:
+            continue
+        if len(matches) > 1:
+            warnings.warn(
+                f"Derived axis '{spec.name}' found {len(matches)} rows for diagonal key {key}; using the first entry"
+            )
+        row = matches[0]
+        product = 1.0
+        valid = True
+        for column in columns:
+            val = _safe_float(row.get(column))
+            if val is None:
+                valid = False
+                break
+            product *= val
+        if valid:
+            rows.append(row)
+            values.append(product)
+    _assign_derived_axis_values(rows, spec, values)
+
+
+def _apply_axis_normalized_product(data: Sequence[Dict[str, Any]], spec: DerivedAxisSpec) -> None:
+    for row in data:
+        row[spec.name] = None
+    mode = (spec.mode or "all").strip().lower()
+    if mode == "diagonal":
+        _apply_axis_normalized_product_diagonal(data, spec)
+    elif mode == "all":
+        _apply_axis_normalized_product_all(data, spec)
+    else:
+        raise ValueError(f"Unsupported mode '{spec.mode}' for derived axis '{spec.name}'")
+
+
+def _apply_derived_axes(data: Sequence[Dict[str, Any]], derived_axes: Dict[str, DerivedAxisSpec]) -> None:
+    if not derived_axes:
+        return
+    for spec in derived_axes.values():
+        transform = spec.transform.strip().lower()
+        if transform == "normalized_product":
+            _apply_axis_normalized_product(data, spec)
+        else:
+            raise ValueError(f"Unsupported derived axis transform '{spec.transform}'")
 
 
 def _get_cmap(name: Optional[str], n: int) -> List[str]:
@@ -1332,6 +1465,80 @@ def _export_surface_plot_paraview(
     return out_path
 
 
+
+def _parse_axis_spec(
+    raw: Any,
+    axis_desc: str,
+    derived_axes: Dict[str, DerivedAxisSpec],
+) -> Tuple[str, Optional[DerivedAxisSpec]]:
+    if raw is None:
+        raise ValueError(f"Missing axis specification for {axis_desc}")
+    if isinstance(raw, str):
+        spec = derived_axes.get(raw)
+        return raw, spec
+    if isinstance(raw, dict):
+        name_value = raw.get("name")
+        axis_type = raw.get("type") or raw.get("transform")
+        if axis_type is None and name_value is not None:
+            key = str(name_value)
+            spec = derived_axes.get(key)
+            if spec is None:
+                raise ValueError(f"Unknown derived axis '{key}' referenced by {axis_desc}")
+            return key, spec
+        if axis_type is None:
+            raise ValueError(f"Axis {axis_desc} requires a 'type' field")
+        axis_type_norm = str(axis_type).strip().lower()
+        if axis_type_norm == "normalized_product":
+            columns_raw = raw.get("columns")
+            if columns_raw is None:
+                raise ValueError(f"Axis {axis_desc} requires 'columns' for normalized_product")
+            if isinstance(columns_raw, (list, tuple)):
+                columns = [str(col) for col in columns_raw]
+            else:
+                columns = [str(columns_raw)]
+            mode_raw = raw.get("mode", "all")
+            mode = str(mode_raw).strip().lower()
+            if mode not in {"all", "diagonal"}:
+                raise ValueError(f"Unsupported mode '{mode_raw}' for axis {axis_desc}")
+            normalize_raw = raw.get("normalize", "max")
+            normalize = str(normalize_raw).strip().lower() if normalize_raw is not None else "max"
+            if normalize in {"", "none", "false", "0"}:
+                normalize = "none"
+            elif normalize != "max":
+                raise ValueError(f"Unsupported normalize value '{normalize_raw}' for axis {axis_desc}")
+            label = raw.get("label")
+            if name_value:
+                derived_name = str(name_value)
+            else:
+                base = "__normprod"
+                index = len(derived_axes) + 1
+                derived_name = f"{base}_{index}"
+                while derived_name in derived_axes:
+                    index += 1
+                    derived_name = f"{base}_{index}"
+            spec = DerivedAxisSpec(
+                name=derived_name,
+                transform=axis_type_norm,
+                columns=columns,
+                mode=mode,
+                normalize=normalize,
+                label=str(label) if label is not None else None,
+            )
+            existing = derived_axes.get(spec.name)
+            if existing is not None:
+                if existing != spec:
+                    raise ValueError(
+                        f"Derived axis '{spec.name}' is defined multiple times with different settings"
+                    )
+                spec = existing
+            else:
+                derived_axes[spec.name] = spec
+            return spec.name, spec
+        raise ValueError(f"Unsupported axis transform '{axis_type}' for {axis_desc}")
+    raise ValueError(f"Invalid axis specification for {axis_desc}")
+
+
+
 def load_analyze_config(raw_cfg: Dict[str, Any]) -> AnalyzeConfig:
     general = raw_cfg.get("general", {})
     palette = general.get("palette", "viridis")
@@ -1343,22 +1550,28 @@ def load_analyze_config(raw_cfg: Dict[str, Any]) -> AnalyzeConfig:
             return value
         if isinstance(value, (int, float)):
             return bool(value)
-        text = str(value).strip().lower()
-        if text in {"true", "1", "yes", "on"}:
+        text_value = str(value).strip().lower()
+        if text_value in {"true", "1", "yes", "on"}:
             return True
-        if text in {"false", "0", "no", "off", ""}:
+        if text_value in {"false", "0", "no", "off", ""}:
             return False
         raise ValueError(f"Invalid boolean value: {value!r}")
+
+    derived_axes: Dict[str, DerivedAxisSpec] = {}
 
     scatter_cfgs: List[ScatterConfig] = []
     for idx, item in enumerate(raw_cfg.get("plots", []) or []):
         name = item.get("name", f"scatter_{idx+1}")
         outfile = item.get("outfile")
-        x_key = item.get("x")
+        raw_x = item.get("x")
         ys_vals = item.get("ys") or []
-        if outfile is None or x_key is None or not ys_vals:
+        if outfile is None or raw_x is None or not ys_vals:
             raise ValueError("Scatter plot entries require 'outfile', 'x', and at least one 'ys'")
-        ys_list = list(ys_vals) if isinstance(ys_vals, (list, tuple)) else [ys_vals]
+        x_key, x_spec = _parse_axis_spec(raw_x, f"scatter plot '{name}' x", derived_axes)
+        if isinstance(ys_vals, (list, tuple)):
+            ys_list = [str(val) for val in ys_vals]
+        else:
+            ys_list = [str(ys_vals)]
         fit_models_raw = item.get("fit_models")
         if fit_models_raw is None:
             fit_models_list = ScatterConfig.__dataclass_fields__["fit_models"].default_factory()  # type: ignore[attr-defined]
@@ -1366,7 +1579,9 @@ def load_analyze_config(raw_cfg: Dict[str, Any]) -> AnalyzeConfig:
             fit_models_list = [str(m) for m in fit_models_raw]
         else:
             fit_models_list = [str(fit_models_raw)]
-
+        xlabel = item.get("xlabel")
+        if xlabel is None and x_spec and x_spec.label:
+            xlabel = x_spec.label
         scatter_cfgs.append(
             ScatterConfig(
                 name=name,
@@ -1375,7 +1590,7 @@ def load_analyze_config(raw_cfg: Dict[str, Any]) -> AnalyzeConfig:
                 ys=ys_list,
                 style=item.get("style", "scatter"),
                 title=item.get("title"),
-                xlabel=item.get("xlabel"),
+                xlabel=xlabel,
                 ylabel=item.get("ylabel"),
                 palette=item.get("palette"),
                 legend=_parse_bool(item.get("legend", True)),
@@ -1486,6 +1701,7 @@ def load_analyze_config(raw_cfg: Dict[str, Any]) -> AnalyzeConfig:
         scatter_plots=scatter_cfgs,
         heatmaps=heatmap_cfgs,
         surface_plots=surface_cfgs,
+        derived_axes=derived_axes,
     )
 
 
@@ -1495,6 +1711,8 @@ def run_analysis(
     config: AnalyzeConfig,
 ) -> List[pathlib.Path]:
     results: List[pathlib.Path] = []
+    if config.derived_axes:
+        _apply_derived_axes(data, config.derived_axes)
     for scatter_cfg in config.scatter_plots:
         out_path, data_sets = plot_scatter(data, scatter_cfg, plots_dir, config.palette)
         results.append(out_path)
@@ -1549,21 +1767,42 @@ def run_analysis(
     return results
 
 
+
 def _collect_required_columns(config: AnalyzeConfig) -> List[str]:
     required: set[str] = set()
+    derived_names = set(config.derived_axes.keys())
     for scatter_cfg in config.scatter_plots:
-        required.add(scatter_cfg.x)
-        required.update(scatter_cfg.ys)
+        if scatter_cfg.x in derived_names:
+            required.update(config.derived_axes[scatter_cfg.x].columns)
+        else:
+            required.add(scatter_cfg.x)
+        for y_key in scatter_cfg.ys:
+            if y_key in derived_names:
+                required.update(config.derived_axes[y_key].columns)
+            else:
+                required.add(y_key)
     for heatmap_cfg in config.heatmaps:
+        if heatmap_cfg.x in derived_names or heatmap_cfg.y in derived_names:
+            raise ValueError("Derived axes are not supported for heatmap configurations")
         required.add(heatmap_cfg.x)
         required.add(heatmap_cfg.y)
         if heatmap_cfg.value:
-            required.add(heatmap_cfg.value)
+            value_key = heatmap_cfg.value
+            if value_key in derived_names:
+                required.update(config.derived_axes[value_key].columns)
+            else:
+                required.add(value_key)
     for surface_cfg in config.surface_plots:
+        if surface_cfg.x in derived_names or surface_cfg.y in derived_names:
+            raise ValueError("Derived axes are not supported for surface configurations")
         required.add(surface_cfg.x)
         required.add(surface_cfg.y)
         if surface_cfg.value:
-            required.add(surface_cfg.value)
+            value_key = surface_cfg.value
+            if value_key in derived_names:
+                required.update(config.derived_axes[value_key].columns)
+            else:
+                required.add(value_key)
     required.discard("file")
     return sorted(required)
 
@@ -1579,6 +1818,7 @@ def validate_required_columns(config: AnalyzeConfig, available_columns: Sequence
 
 
 __all__ = [
+    "DerivedAxisSpec",
     "AnalyzeConfig",
     "ScatterConfig",
     "FitConfig",
