@@ -124,7 +124,7 @@ class SurfaceConfig(HeatmapConfig):
 
 @dataclass
 class AnalyzeConfig:
-    palette: str = "Blues"
+    palette: str = "viridis"
     scatter_plots: List[ScatterConfig] = field(default_factory=list)
     heatmaps: List[HeatmapConfig] = field(default_factory=list)
     surface_plots: List[SurfaceConfig] = field(default_factory=list)
@@ -248,8 +248,11 @@ def _apply_axis_scale(ax: plt.Axes, log_x: bool, log_y: bool) -> None:
 
 
 def _get_cmap(name: Optional[str], n: int) -> List[str]:
-    cmap = plt.get_cmap(name or "viridis", max(n, 1))
-    return [cmap(i) for i in range(max(n, 1))]
+    size = max(n, 1)
+    cmap = plt.get_cmap(name or "viridis", size)
+    positions = np.linspace(0.0, 1.0, size)
+    # Evenly sample the colormap so each series gets a distinct color
+    return [cmap(float(pos)) for pos in positions]
 
 
 def plot_scatter(
@@ -1331,7 +1334,7 @@ def _export_surface_plot_paraview(
 
 def load_analyze_config(raw_cfg: Dict[str, Any]) -> AnalyzeConfig:
     general = raw_cfg.get("general", {})
-    palette = general.get("palette", "Blues")
+    palette = general.get("palette", "viridis")
 
     def _parse_bool(value: Any, default: bool = False) -> bool:
         if value is None:
