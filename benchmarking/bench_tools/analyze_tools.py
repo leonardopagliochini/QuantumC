@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import seaborn as sns
+
 import csv
 import math
 import pathlib
@@ -15,9 +17,26 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+
+# Register Seaborn colormaps (not included in Matplotlib by default)
+for cmap_name in ["mako", "rocket", "flare", "crest"]:
+    try:
+        cmap = sns.color_palette(cmap_name, as_cmap=True)
+        plt.register_cmap(name=cmap_name, cmap=cmap)
+        plt.register_cmap(name=cmap_name + "_r", cmap=cmap.reversed())
+    except Exception:
+        # Safe fallback if seaborn doesn't provide the cmap
+        pass
+
+
+
 from matplotlib.colors import LogNorm
 from matplotlib import colors as mcolors
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401  # register 3D projection for Matplotlib
+
+
+
 
 COEFF_ABS_THRESHOLD = 0.01
 COEFF_REL_THRESHOLD = 0.01
@@ -130,6 +149,10 @@ class SurfaceConfig(HeatmapConfig):
     antialiased: bool = True
     paraview_outfile: Optional[str] = None
     paraview_scale: float = 1.0
+    z_min: Optional[float] = None
+    z_max: Optional[float] = None
+    color_min: Optional[float] = None
+    color_max: Optional[float] = None
 
 
 @dataclass
@@ -1142,6 +1165,9 @@ def plot_surface(
     y_coords = matrix.y_ticks - y_shift
     z_grid = np.asarray(matrix.data, dtype=float)
     z_masked = np.ma.masked_invalid(z_grid)
+    finite_z = z_grid[np.isfinite(z_grid)]
+    data_z_min = float(finite_z.min()) if finite_z.size else None
+    data_z_max = float(finite_z.max()) if finite_z.size else None
 
     X, Y = np.meshgrid(x_coords, y_coords)
 
@@ -1169,26 +1195,58 @@ def plot_surface(
         )
     else:
         norm = None
+        color_lower = config.color_min
+        color_upper = config.color_max
         if config.log_value:
-            positive = z_grid[z_grid > 0]
+            positive = finite_z[finite_z > 0]
             if not positive.size:
                 raise ValueError(
                     f"Surface plot '{config.name}' cannot apply log_value on non-positive data"
                 )
-            vmin = float(positive.min())
-            vmax = float(z_grid.max()) if z_grid.size else vmin
-            if vmax <= vmin:
-                vmax = vmin * 10.0
-            norm = LogNorm(vmin=max(vmin, 1e-9), vmax=max(vmax, vmin * 10.0))
+            lower = float(color_lower) if color_lower is not None else float(positive.min())
+            upper = float(color_upper) if color_upper is not None else float(positive.max())
+            if lower <= 0.0:
+                raise ValueError(
+                    f"Surface plot '{config.name}' requires color_min > 0 when log_value is true"
+                )
+            if upper <= 0.0:
+                raise ValueError(
+                    f"Surface plot '{config.name}' requires color_max > 0 when log_value is true"
+                )
+            if upper <= lower:
+                upper = lower * 10.0
+            norm = LogNorm(vmin=lower, vmax=upper)
+        else:
+            lower = float(color_lower) if color_lower is not None else data_z_min
+            upper = float(color_upper) if color_upper is not None else data_z_max
+            if lower is None and upper is None:
+                norm = None
+            else:
+                if lower is None:
+                    lower = upper
+                if upper is None:
+                    upper = lower
+                if lower is not None and upper is not None:
+                    if lower > upper:
+                        lower, upper = upper, lower
+                    if math.isclose(lower, upper):
+                        span = abs(lower) if lower != 0.0 else 1.0
+                        upper = lower + span * 1e-6
+                    norm = mcolors.Normalize(vmin=lower, vmax=upper)
+
+        plot_kwargs: Dict[str, Any] = dict(stride_kwargs)
+        plot_kwargs.update(
+            cmap=cmap,
+            linewidth=0.0,
+            antialiased=config.antialiased,
+        )
+        if norm is not None:
+            plot_kwargs["norm"] = norm
         surface_artist = ax.plot_surface(
             X,
             Y,
             z_masked,
-            cmap=cmap,
-            linewidth=0.0,
-            antialiased=config.antialiased,
-            norm=norm,
-            **stride_kwargs,
+            **plot_kwargs,
         )
 
     ax.set_xlabel(config.xlabel or config.x)
@@ -1215,6 +1273,22 @@ def plot_surface(
 
     if config.title:
         ax.set_title(config.title)
+
+    z_lower = config.z_min if config.z_min is not None else data_z_min
+    z_upper = config.z_max if config.z_max is not None else data_z_max
+    if z_lower is not None or z_upper is not None:
+        current_min, current_max = ax.get_zlim()
+        if z_lower is None:
+            z_lower = current_min
+        if z_upper is None:
+            z_upper = current_max
+        if z_lower is not None and z_upper is not None:
+            if z_lower > z_upper:
+                z_lower, z_upper = z_upper, z_lower
+            if math.isclose(z_lower, z_upper):
+                span = abs(z_lower) if z_lower != 0.0 else 1.0
+                z_upper = z_lower + span * 1e-6
+        ax.set_zlim(z_lower, z_upper)
 
     ax.view_init(elev=float(config.view_elev), azim=float(config.view_azim))
 
@@ -1310,6 +1384,10 @@ def _export_surface_plot_interactive(
     if not np.isfinite(z_grid).any():
         raise ValueError("Interactive surface requires at least one finite value")
 
+    finite_z = z_grid[np.isfinite(z_grid)]
+    data_z_min = float(finite_z.min()) if finite_z.size else None
+    data_z_max = float(finite_z.max()) if finite_z.size else None
+
     X, Y = np.meshgrid(x_vals, y_vals)
 
     colorscale = _build_plotly_colorscale(config.palette or default_palette)
@@ -1319,32 +1397,61 @@ def _export_surface_plot_interactive(
     colorbar_title = config.value or config.agg
     colorbar_args: Dict[str, Any] = {"title": colorbar_title}
 
+    color_lower = config.color_min
+    color_upper = config.color_max
+
     if config.log_value:
         positive = color_values[(color_values > 0) & finite_mask]
         if not positive.size:
             raise ValueError(
                 f"Interactive surface '{config.name}' cannot apply log_value on non-positive data"
             )
-        color_values = np.where(color_values > 0, np.log10(color_values), np.nan)
-        log_mask = np.isfinite(color_values)
-        if not log_mask.any():
+        lower = float(color_lower) if color_lower is not None else float(np.nanmin(positive))
+        upper = float(color_upper) if color_upper is not None else float(np.nanmax(positive))
+        if lower <= 0.0:
             raise ValueError(
-                f"Interactive surface '{config.name}' has no positive values after log10"
+                f"Interactive surface '{config.name}' requires color_min > 0 when log_value is true"
             )
-        cmin = float(np.nanmin(color_values[log_mask]))
-        cmax = float(np.nanmax(color_values[log_mask]))
+        if upper <= 0.0:
+            raise ValueError(
+                f"Interactive surface '{config.name}' requires color_max > 0 when log_value is true"
+            )
+        if upper <= lower:
+            upper = lower * 10.0
+        color_values = np.where(color_values > 0, np.log10(color_values), np.nan)
+        log_lower = math.log10(lower)
+        log_upper = math.log10(upper)
+        cmin = log_lower
+        cmax = log_upper
         colorbar_args["title"] = f"log10({colorbar_title})"
-        min_exp = math.floor(cmin)
-        max_exp = math.ceil(cmax)
+        min_exp = math.floor(log_lower)
+        max_exp = math.ceil(log_upper)
         tick_vals = list(range(min_exp, max_exp + 1)) or [min_exp]
         colorbar_args["tickvals"] = tick_vals
         colorbar_args["ticktext"] = [f"1e{int(val)}" for val in tick_vals]
     else:
         if finite_mask.any():
-            cmin = float(np.nanmin(color_values[finite_mask]))
-            cmax = float(np.nanmax(color_values[finite_mask]))
+            data_min = float(np.nanmin(color_values[finite_mask]))
+            data_max = float(np.nanmax(color_values[finite_mask]))
         else:
+            data_min = data_max = None
+        lower = float(color_lower) if color_lower is not None else data_min
+        upper = float(color_upper) if color_upper is not None else data_max
+        if lower is None and upper is None:
             cmin = cmax = None
+        else:
+            if lower is None:
+                lower = upper
+            if upper is None:
+                upper = lower
+            if lower is not None and upper is not None:
+                if lower > upper:
+                    lower, upper = upper, lower
+                if math.isclose(lower, upper):
+                    span = abs(lower) if lower != 0.0 else 1.0
+                    upper = lower + span * 1e-6
+            cmin = lower
+            cmax = upper
 
     if cmin is not None and cmax is not None:
         if math.isclose(cmin, cmax):
@@ -1374,6 +1481,22 @@ def _export_surface_plot_interactive(
     else:
         y_tick_text = matrix.y_tick_labels or [f"{val:.3g}" for val in y_vals]
 
+    axis_z_min = config.z_min if config.z_min is not None else data_z_min
+    axis_z_max = config.z_max if config.z_max is not None else data_z_max
+    z_axis_kwargs: Dict[str, Any] = {"title": config.zlabel or config.value or config.agg}
+    if axis_z_min is not None or axis_z_max is not None:
+        if axis_z_min is None:
+            axis_z_min = axis_z_max
+        if axis_z_max is None:
+            axis_z_max = axis_z_min
+        if axis_z_min is not None and axis_z_max is not None:
+            if axis_z_min > axis_z_max:
+                axis_z_min, axis_z_max = axis_z_max, axis_z_min
+            if math.isclose(axis_z_min, axis_z_max):
+                span = abs(axis_z_min) if axis_z_min != 0.0 else 1.0
+                axis_z_max = axis_z_min + span * 1e-6
+            z_axis_kwargs["range"] = [axis_z_min, axis_z_max]
+
     fig = go.Figure(data=[surface])
     fig.update_layout(
         title=config.title,
@@ -1390,7 +1513,7 @@ def _export_surface_plot_interactive(
                 tickvals=y_vals.tolist(),
                 ticktext=y_tick_text,
             ),
-            zaxis=dict(title=config.zlabel or config.value or config.agg),
+            zaxis=z_axis_kwargs,
         ),
         scene_camera=dict(eye=_compute_camera_eye(config.view_elev, config.view_azim)),
     )
@@ -1686,6 +1809,10 @@ def load_analyze_config(raw_cfg: Dict[str, Any]) -> AnalyzeConfig:
                 surface_kind=item.get("surface_kind", "surface"),
                 paraview_outfile=item.get("paraview_outfile"),
                 paraview_scale=float(item.get("paraview_scale", 1.0) or 1.0),
+                z_min=float(item.get("z_min")) if item.get("z_min") is not None else None,
+                z_max=float(item.get("z_max")) if item.get("z_max") is not None else None,
+                color_min=float(item.get("color_min")) if item.get("color_min") is not None else None,
+                color_max=float(item.get("color_max")) if item.get("color_max") is not None else None,
                 x_tick_round=float(item.get("x_tick_round")) if item.get("x_tick_round") is not None else None,
                 y_tick_round=float(item.get("y_tick_round")) if item.get("y_tick_round") is not None else None,
                 rstride=int(rstride) if rstride is not None else None,
